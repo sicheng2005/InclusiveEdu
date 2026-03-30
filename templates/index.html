@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set role_label = "" %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-4 fw-bold text-primary mb-3">
+        <i class="bi bi-universal-access-circle"></i> 无障碍线上教学辅助平台
+    </h1>
+    <p class="lead text-muted mb-5">让每一位学生都能平等地参与课堂 — 支持实时文字、互动与课件朗读等无障碍能力</p>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-5">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body text-center">
+                    <i class="bi bi-mortarboard-fill text-primary" style="font-size:3rem"></i>
+                    <h5 class="card-title mt-3">老师</h5>
+                    <p class="card-text text-muted">创建课堂、上传课件、实时授课与发送课堂文字</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-people-fill text-success" style="font-size:3rem"></i>
+                    <h5 class="card-title mt-3">学生</h5>
+                    <p class="card-text text-muted">加入课堂后，可按需使用字幕与互动、课件文字预览与朗读等功能</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        {% if user %}
+            {% if user.role == 'teacher' %}
+            <a href="/teacher" class="btn btn-primary btn-lg me-2">进入老师端</a>
+            {% else %}
+            <a href="/student" class="btn btn-success btn-lg me-2">进入学习端</a>
+            {% endif %}
+        {% else %}
+            <a href="/login" class="btn btn-primary btn-lg me-2">立即登录</a>
+            <a href="/register" class="btn btn-outline-primary btn-lg">注册账号</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

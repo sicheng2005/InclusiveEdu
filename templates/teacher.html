@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% set role_label = "老师" %}
+
+{% block title %}老师工作台 - 无障碍教学平台{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-mortarboard-fill text-primary"></i> 老师工作台</h2>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span><i class="bi bi-journal-text"></i> 我的课程 / 课堂</span>
+        {% if classroom %}
+        <span class="badge bg-light text-primary">当前有一场进行中的课堂</span>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>课堂名称</th>
+                        <th>房间号</th>
+                        <th>课件数</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                        <th style="min-width:200px">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in classrooms %}
+                    <tr>
+                        <td>{{ c.name }}</td>
+                        <td><code class="user-select-all">{{ c.room_code }}</code></td>
+                        <td>{{ c.cw_count }}</td>
+                        <td>
+                            {% if c.is_active %}
+                            <span class="badge bg-success">进行中</span>
+                            {% else %}
+                            <span class="badge bg-secondary">已结束</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ c.created_at }}</small></td>
+                        <td>
+                            {% if c.is_active %}
+                            <a href="/teacher/live" class="btn btn-sm btn-primary"><i class="bi bi-broadcast"></i> 进入授课</a>
+                            <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束该课堂？结束后学生将无法再通过房间号加入。');">
+                                <input type="hidden" name="classroom_id" value="{{ c.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">暂无课程记录，请在下方创建第一场课堂。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white"><i class="bi bi-plus-circle"></i> 创建新课堂</div>
+            <div class="card-body">
+                <form method="post" action="/create-classroom">
+                    <label class="form-label">课堂名称</label>
+                    <div class="input-group">
+                        <input type="text" name="room_name" class="form-control" placeholder="例如：高一物理第3课" required maxlength="120">
+                        <button type="submit" class="btn btn-success">创建</button>
+                    </div>
+                </form>
+                <p class="small text-muted mt-2 mb-0">创建新课堂时，若您上一场课堂仍在「进行中」，系统会自动将其结束并生成新房间号。</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-warning text-dark"><i class="bi bi-file-earmark-slides"></i> 当前课堂课件</div>
+            <div class="card-body">
+                {% if classroom %}
+                <p class="small text-muted">以下课件仅属于当前进行中的课堂「{{ classroom.name }}」（房间 {{ classroom.room_code }}）。</p>
+                <form method="post" action="/upload-courseware" enctype="multipart/form-data" class="mb-3">
+                    <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                    <input type="hidden" name="redirect_to" value="/teacher">
+                    <div class="input-group">
+                        <input type="file" name="file" class="form-control" accept=".txt,.pptx,.pdf,.docx" required>
+                        <button type="submit" class="btn btn-warning">上传</button>
+                    </div>
+                    <small class="text-muted">支持 .txt / .pptx / .pdf / .docx</small>
+                </form>
+                <ul class="list-group list-group-flush">
+                    {% for cw in courseware_list %}
+                    <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item px-0 text-muted text-center">本场课堂暂无课件</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-folder2-open text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted small mt-2 mb-0">请先创建并进入一场课堂，课件将按课堂分别保存并展示。</p>
+                </div>
+                {% endif %}
+
+                {% if courseware_orphan and courseware_orphan|length > 0 %}
+                <hr>
+                <p class="small fw-bold text-secondary mb-1">未绑定课堂的旧课件</p>
+                <ul class="list-group list-group-flush small">
+                    {% for cw in courseware_orphan %}
+                    <li class="list-group-item px-0 py-1 text-muted"><i class="bi bi-file-earmark"></i> {{ cw.original_name }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if classroom %}
+<div class="alert alert-info mt-4 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <span><i class="bi bi-info-circle"></i> 您有进行中的课堂「{{ classroom.name }}」，房间号 <strong>{{ classroom.room_code }}</strong>。</span>
+    <a href="/teacher/live" class="btn btn-sm btn-primary">进入授课控制台</a>
+</div>
+{% endif %}
+{% endblock %}

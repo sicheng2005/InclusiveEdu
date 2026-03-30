@@ -1,0 +1,34 @@
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 本地数据与上传（勿提交到公开仓库）
+platform.db
+*.db-journal
+uploads/
+
+# 环境变量与密钥
+.env
+.env.local
+*.pem
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% set role_label = "学生" %}
+
+{% block title %}学习端 - 无障碍教学平台{% endblock %}
+
+{% block content %}
+<h2 class="mb-2"><i class="bi bi-book-half text-primary"></i> 学习端</h2>
+<p class="text-muted mb-4">您可在同一页面按需使用实时文字、评论互动与课件朗读等功能，无需在注册时做类别选择。</p>
+
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white"><i class="bi bi-door-open"></i> 加入课堂</div>
+            <div class="card-body">
+                <div class="row align-items-end g-3">
+                    <div class="col-md-6 col-lg-4">
+                        <label class="form-label mb-1">房间号</label>
+                        <div class="input-group">
+                            <input type="text" id="roomCodeInput" class="form-control text-uppercase" placeholder="例如 AD0081" maxlength="12" autocomplete="off">
+                            <button type="button" class="btn btn-primary" id="btnJoin">加入</button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-8 d-flex flex-wrap align-items-center gap-2" id="joinStatusArea" style="display: none;">
+                        <p id="joinStatus" class="small text-muted mb-0 flex-grow-1"></p>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLeaveClassroom" title="断开课堂连接">
+                            <i class="bi bi-box-arrow-left"></i> 退出课堂
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1" id="classroomWorkspace" style="display: none;">
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white"><i class="bi bi-badge-cc"></i> 实时文字与互动</div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="commentInput" class="form-control" placeholder="输入评论或互动文字…" disabled>
+                    <button class="btn btn-outline-secondary" id="btnSendComment" disabled>发送</button>
+                </div>
+                <small class="text-muted d-block mb-3">如需接入手语识别，可将识别结果填入上方输入框后发送。</small>
+                <div id="subtitleArea" class="border rounded p-3 bg-light" style="min-height:260px;max-height:380px;overflow-y:auto;font-size:1.05rem;">
+                    <p class="text-muted text-center mb-0">加入课堂后将显示字幕与课堂消息</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-dark text-white"><i class="bi bi-file-earmark-text"></i> 课件文字朗读</div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush mb-3" id="coursewareList">
+                    <li class="list-group-item text-muted text-center border-0">加入课堂后显示课件列表</li>
+                </ul>
+                <div class="border rounded p-3 bg-light small" style="max-height:160px;overflow-y:auto" id="previewText" aria-live="polite">
+                    <span class="text-muted">点击课件可预览文字；支持时将以语音朗读。</span>
+                </div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="autoSpeakSubtitles">
+                    <label class="form-check-label" for="autoSpeakSubtitles">自动朗读老师发送的课堂字幕</label>
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm mt-2" id="btnStopSpeech">停止朗读</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let ws = null;
+    let autoSpeakSubtitles = false;
+    let joinedClassroomId = null;
+
+    function appendLine(title, body, cls) {
+        const area = document.getElementById("subtitleArea");
+        const placeholder = area.querySelector(".text-muted.text-center");
+        if (placeholder) area.innerHTML = "";
+        const p = document.createElement("p");
+        p.className = "mb-2";
+        p.innerHTML = `<span class="${cls || "text-dark"} fw-bold">[${title}]</span> ${body}`;
+        area.appendChild(p);
+        area.scrollTop = area.scrollHeight;
+    }
+
+    function speak(text) {
+        if (!text || !("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "zh-CN";
+        window.speechSynthesis.speak(u);
+    }
+
+    document.getElementById("autoSpeakSubtitles").addEventListener("change", (e) => {
+        autoSpeakSubtitles = e.target.checked;
+    });
+
+    document.getElementById("btnStopSpeech").addEventListener("click", () => {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    });
+
+    function connectWs(roomCode) {
+        if (ws) { try { ws.close(); } catch (e) {} }
+        const key = String(roomCode || "").trim().toUpperCase();
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(key)}`;
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => appendLine("系统", "已连接课堂（房间 " + key + "）", "text-info");
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === "system") {
+                appendLine("系统", msg.content, "text-info");
+            } else if (msg.type === "subtitle") {
+                appendLine("字幕", msg.content, "text-primary");
+                if (autoSpeakSubtitles && msg.content) speak(msg.content);
+            } else if (msg.type === "comment") {
+                appendLine((msg.username || "同学") + " 评论", msg.content, "text-success");
+            } else {
+                appendLine("消息", typeof msg.content === "string" ? msg.content : JSON.stringify(msg), "text-secondary");
+            }
+        };
+        ws.onclose = () => appendLine("系统", "连接已断开", "text-danger");
+        ws.onerror = () => appendLine("系统", "连接异常", "text-danger");
+    }
+
+    async function loadCoursewareList(items) {
+        const ul = document.getElementById("coursewareList");
+        ul.innerHTML = "";
+        if (!items || !items.length) {
+            ul.innerHTML = '<li class="list-group-item text-muted text-center border-0">暂无课件</li>';
+            return;
+        }
+        for (const cw of items) {
+            const li = document.createElement("li");
+            li.className = "list-group-item list-group-item-action border-0 px-0";
+            li.tabIndex = 0;
+            li.setAttribute("role", "button");
+            li.textContent = cw.name;
+            li.addEventListener("click", async () => {
+                if (joinedClassroomId == null) {
+                    document.getElementById("previewText").textContent = "请先加入课堂";
+                    return;
+                }
+                const res = await fetch(
+                    "/api/courseware/" + cw.id + "/text?classroom_id=" + encodeURIComponent(joinedClassroomId),
+                    { credentials: "same-origin" }
+                );
+                const data = await res.json();
+                if (!res.ok) {
+                    document.getElementById("previewText").textContent = data.error || "加载失败";
+                    return;
+                }
+                const t = data.text || "（暂无提取文本）";
+                document.getElementById("previewText").textContent = t;
+                speak(t);
+            });
+            li.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); li.click(); }
+            });
+            ul.appendChild(li);
+        }
+    }
+
+    document.getElementById("btnJoin").addEventListener("click", async () => {
+        const code = document.getElementById("roomCodeInput").value.trim().toUpperCase();
+        const status = document.getElementById("joinStatus");
+        if (!code) {
+            status.textContent = "请输入房间号";
+            return;
+        }
+        status.textContent = "正在加入…";
+        const fd = new FormData();
+        fd.append("room_code", code);
+        const res = await fetch("/api/join-classroom", { method: "POST", body: fd, credentials: "same-origin" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            status.textContent = data.error || "加入失败";
+            return;
+        }
+        joinedClassroomId = data.classroom_id;
+        status.textContent = "已加入：" + data.room_name + "（房间 " + data.room_code + "）";
+        document.getElementById("joinStatusArea").style.display = "flex";
+        document.getElementById("commentInput").disabled = false;
+        document.getElementById("btnSendComment").disabled = false;
+        document.getElementById("classroomWorkspace").style.display = "flex";
+        await loadCoursewareList(data.courseware);
+        connectWs(data.room_code);
+    });
+
+    function sendComment() {
+        const input = document.getElementById("commentInput");
+        const text = input.value.trim();
+        if (!text) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            appendLine("系统", "未连接课堂，请先输入房间号加入", "text-danger");
+            return;
+        }
+        ws.send(JSON.stringify({ type: "comment", content: text }));
+        input.value = "";
+    }
+
+    document.getElementById("btnLeaveClassroom").addEventListener("click", () => {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        if (ws) {
+            try { ws.close(); } catch (e) {}
+            ws = null;
+        }
+        joinedClassroomId = null;
+        document.getElementById("classroomWorkspace").style.display = "none";
+        document.getElementById("joinStatusArea").style.display = "none";
+        document.getElementById("joinStatus").textContent = "";
+        document.getElementById("roomCodeInput").value = "";
+        document.getElementById("commentInput").disabled = true;
+        document.getElementById("btnSendComment").disabled = true;
+    });
+
+    document.getElementById("btnSendComment").addEventListener("click", sendComment);
+    document.getElementById("commentInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendComment();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% set role_label = "" %}
+
+{% block title %}注册 - 无障碍教学平台{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow mt-4">
+            <div class="card-body p-4">
+                <h3 class="text-center mb-4"><i class="bi bi-person-plus-fill"></i> 注册账号</h3>
+
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="post" action="/register">
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" name="username" class="form-control form-control-lg" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">密码</label>
+                        <input type="password" name="password" class="form-control form-control-lg" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">选择您的身份</label>
+                        <div class="row g-3 mt-1 justify-content-center">
+                            <div class="col-md-5">
+                                <input type="radio" class="btn-check" name="role" id="role_teacher" value="teacher" required>
+                                <label class="btn btn-outline-primary w-100 py-4" for="role_teacher">
+                                    <i class="bi bi-mortarboard-fill d-block" style="font-size:1.75rem"></i>
+                                    老师
+                                </label>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="radio" class="btn-check" name="role" id="role_student" value="student">
+                                <label class="btn btn-outline-success w-100 py-4" for="role_student">
+                                    <i class="bi bi-person-fill d-block" style="font-size:1.75rem"></i>
+                                    学生
+                                </label>
+                            </div>
+                        </div>
+                        <p class="small text-muted text-center mt-3 mb-0">学生登录后可在学习端按需使用字幕、互动与朗读等功能。</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">注册</button>
+                </form>
+
+                <p class="text-center mt-3 mb-0">
+                    已有账号？<a href="/login">去登录</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

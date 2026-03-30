@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% set role_label = "老师" %}
+
+{% block title %}授课控制台 - 无障碍教学平台{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/teacher">老师工作台</a></li>
+        <li class="breadcrumb-item active" aria-current="page">授课控制台</li>
+    </ol>
+</nav>
+
+<h2 class="mb-3"><i class="bi bi-broadcast text-primary"></i> 授课控制台</h2>
+<p class="text-muted small mb-4">
+    <strong>退出课堂</strong>：仅您本人离开本页并返回工作台，课堂仍进行，学生可继续上课。
+    <strong>结束课堂</strong>：正式下课，学生将无法再通过房间号加入。
+</p>
+
+<div class="row g-4">
+    <div class="col-md-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span><i class="bi bi-broadcast"></i> 实时课堂</span>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="/teacher" class="btn btn-sm btn-outline-light" id="btnExitClassroom" title="返回工作台，课堂继续进行">
+                        <i class="bi bi-box-arrow-left"></i> 退出课堂
+                    </a>
+                    <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束本课堂？学生将无法再通过房间号加入。');">
+                        <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                        <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
+                    </form>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success mb-3">
+                    <strong>当前课堂：</strong>{{ classroom.name }}<br>
+                    <strong>房间号：</strong>
+                    <span class="badge bg-dark fs-5 user-select-all" id="roomCode">{{ classroom.room_code }}</span>
+                    <small class="text-muted ms-2">（请学生输入同一房间号加入）</small>
+                </div>
+                <div id="classroomArea">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">发送字幕 / 授课内容（学生端将显示此文字）</label>
+                        <div class="input-group">
+                            <input type="text" id="subtitleInput" class="form-control" placeholder="输入授课文字...">
+                            <button class="btn btn-primary" id="btnSendSubtitle">发送字幕</button>
+                        </div>
+                    </div>
+                    <div class="border rounded p-3 bg-light" style="height:280px;overflow-y:auto" id="messageArea">
+                        <p class="text-muted text-center">课堂消息将显示在这里...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark"><i class="bi bi-file-earmark-slides"></i> 课件管理</div>
+            <div class="card-body">
+                <form method="post" action="/upload-courseware" enctype="multipart/form-data" class="mb-3">
+                    <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                    <input type="hidden" name="redirect_to" value="/teacher/live">
+                    <div class="input-group">
+                        <input type="file" name="file" class="form-control" accept=".txt,.pptx,.pdf,.docx" required>
+                        <button type="submit" class="btn btn-warning">上传</button>
+                    </div>
+                    <small class="text-muted">仅本场课堂「{{ classroom.name }}」可见。支持 .txt / .pptx / .pdf / .docx</small>
+                </form>
+                <ul class="list-group">
+                    {% for cw in courseware_list %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted text-center">暂无课件</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const roomCode = "{{ classroom.room_code }}".trim().toUpperCase();
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(roomCode)}`;
+    let ws = null;
+
+    function connectWS() {
+        if (ws) {
+            try { ws.close(); } catch (e) {}
+        }
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => appendMsg("系统", "已连接到课堂（房间 " + roomCode + "）", "text-info");
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === "system") {
+                appendMsg("系统", msg.content, "text-info");
+            } else if (msg.type === "comment") {
+                appendMsg(msg.username + "（学生评论）", msg.content, "text-success fw-bold");
+            } else if (msg.type === "subtitle") {
+                appendMsg("字幕", msg.content, "text-primary");
+            }
+        };
+        ws.onclose = () => appendMsg("系统", "连接已断开", "text-danger");
+        ws.onerror = () => appendMsg("系统", "连接异常（若使用 HTTPS 页面，请确认使用 wss）", "text-danger");
+    }
+
+    function appendMsg(sender, content, cls) {
+        const area = document.getElementById("messageArea");
+        if (area.querySelector(".text-muted.text-center")) area.innerHTML = "";
+        const p = document.createElement("p");
+        p.className = "mb-1";
+        p.innerHTML = `<span class="${cls}">[${sender}]</span> ${content}`;
+        area.appendChild(p);
+        area.scrollTop = area.scrollHeight;
+    }
+
+    document.getElementById("btnSendSubtitle").addEventListener("click", () => {
+        const input = document.getElementById("subtitleInput");
+        const text = input.value.trim();
+        if (!text) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            appendMsg("系统", "未连接到课堂，请刷新页面重试", "text-danger");
+            return;
+        }
+        ws.send(JSON.stringify({type: "subtitle", content: text}));
+        input.value = "";
+    });
+
+    document.getElementById("btnExitClassroom").addEventListener("click", (e) => {
+        e.preventDefault();
+        if (ws) {
+            try { ws.close(); } catch (err) {}
+            ws = null;
+        }
+        window.location.href = "/teacher";
+    });
+
+    document.getElementById("subtitleInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("btnSendSubtitle").click();
+    });
+
+    connectWS();
+</script>
+{% endblock %}

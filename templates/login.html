@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set role_label = "" %}
+
+{% block title %}登录 - 无障碍教学平台{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow mt-5">
+            <div class="card-body p-4">
+                <h3 class="text-center mb-4"><i class="bi bi-box-arrow-in-right"></i> 用户登录</h3>
+
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="post" action="/login">
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" name="username" class="form-control form-control-lg" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">密码</label>
+                        <input type="password" name="password" class="form-control form-control-lg" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">登录</button>
+                </form>
+
+                <p class="text-center mt-3 mb-0">
+                    还没有账号？<a href="/register">立即注册</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
