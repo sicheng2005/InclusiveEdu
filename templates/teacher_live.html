@@ -11,71 +11,128 @@
     </ol>
 </nav>
 
-<h2 class="mb-3"><i class="bi bi-broadcast text-primary"></i> 授课控制台</h2>
-<p class="text-muted small mb-4">
-    <strong>退出课堂</strong>：仅您本人离开本页并返回工作台，课堂仍进行，学生可继续上课。
-    <strong>结束课堂</strong>：正式下课，学生将无法再通过房间号加入。
-</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-broadcast text-primary"></i> 授课控制台</h2>
+    <div class="d-flex gap-2">
+        <a href="/teacher" class="btn btn-outline-secondary" id="btnExitClassroom" title="返回工作台，课堂继续进行">
+            <i class="bi bi-box-arrow-left"></i> 退出课堂
+        </a>
+        <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束本课堂？学生将无法再通过房间号加入。');">
+            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+            <button type="submit" class="btn btn-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
+        </form>
+    </div>
+</div>
 
-<div class="row g-4">
-    <div class="col-md-7">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <span><i class="bi bi-broadcast"></i> 实时课堂</span>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="/teacher" class="btn btn-sm btn-outline-light" id="btnExitClassroom" title="返回工作台，课堂继续进行">
-                        <i class="bi bi-box-arrow-left"></i> 退出课堂
-                    </a>
-                    <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束本课堂？学生将无法再通过房间号加入。');">
-                        <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
-                        <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
-                    </form>
+<div class="alert alert-success mb-3 d-flex justify-content-between align-items-center">
+    <div>
+        <strong>当前课堂：</strong>{{ classroom.name }} | 
+        <strong>房间号：</strong>
+        <span class="badge bg-dark fs-5 user-select-all" id="roomCode">{{ classroom.room_code }}</span>
+        <small class="text-muted ms-2">（请学生输入同一房间号加入）</small>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- 左侧主屏幕区 (占 9 列) -->
+    <div class="col-lg-9 d-flex flex-column gap-3">
+        
+        <!-- 课件主展示区 -->
+        <div class="card shadow-sm flex-grow-1">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-easel"></i> 课堂主屏幕</span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="btnToggleMic"><i class="bi bi-mic-mute"></i> 打开麦克风</button>
+                    <button class="btn btn-sm btn-outline-light" id="btnToggleCam"><i class="bi bi-camera-video-off"></i> 打开摄像头</button>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="alert alert-success mb-3">
-                    <strong>当前课堂：</strong>{{ classroom.name }}<br>
-                    <strong>房间号：</strong>
-                    <span class="badge bg-dark fs-5 user-select-all" id="roomCode">{{ classroom.room_code }}</span>
-                    <small class="text-muted ms-2">（请学生输入同一房间号加入）</small>
+            <!-- 主屏幕内容：展示课件 -->
+            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <div class="text-center text-white-50">
+                    <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
+                    <h4>课件展示区</h4>
+                    <p>学生端将同步看到此区域的课件内容</p>
                 </div>
-                <div id="classroomArea">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">发送字幕 / 授课内容（学生端将显示此文字）</label>
-                        <div class="input-group">
-                            <input type="text" id="subtitleInput" class="form-control" placeholder="输入授课文字...">
-                            <button class="btn btn-primary" id="btnSendSubtitle">发送字幕</button>
+            </div>
+        </div>
+
+        <!-- 底部控制区：字幕与课件管理 -->
+        <div class="row g-3">
+            <div class="col-md-7">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white"><i class="bi bi-chat-dots"></i> 实时字幕与互动</div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <div class="input-group">
+                                <input type="text" id="subtitleInput" class="form-control" placeholder="输入授课文字或语音识别结果...">
+                                <button class="btn btn-primary" id="btnSendSubtitle">发送字幕</button>
+                            </div>
+                        </div>
+                        <div class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto;" id="messageArea">
+                            <p class="text-muted text-center small mt-2">课堂消息将显示在这里...</p>
                         </div>
                     </div>
-                    <div class="border rounded p-3 bg-light" style="height:280px;overflow-y:auto" id="messageArea">
-                        <p class="text-muted text-center">课堂消息将显示在这里...</p>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-warning text-dark"><i class="bi bi-folder2-open"></i> 课件管理</div>
+                    <div class="card-body" style="overflow-y: auto; max-height: 220px;">
+                        <form method="post" action="/upload-courseware" enctype="multipart/form-data" class="mb-2">
+                            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                            <input type="hidden" name="redirect_to" value="/teacher/live">
+                            <div class="input-group input-group-sm">
+                                <input type="file" name="file" class="form-control" accept=".txt,.pptx,.pdf,.docx" required>
+                                <button type="submit" class="btn btn-warning">上传</button>
+                            </div>
+                        </form>
+                        <ul class="list-group list-group-sm">
+                            {% for cw in courseware_list %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                                <span class="text-truncate" style="max-width: 80%;" title="{{ cw.original_name }}"><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
+                                <button class="btn btn-xs btn-outline-primary py-0 px-1" style="font-size: 0.75rem;">展示</button>
+                            </li>
+                            {% else %}
+                            <li class="list-group-item text-muted text-center py-1">暂无课件</li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-5">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-warning text-dark"><i class="bi bi-file-earmark-slides"></i> 课件管理</div>
-            <div class="card-body">
-                <form method="post" action="/upload-courseware" enctype="multipart/form-data" class="mb-3">
-                    <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
-                    <input type="hidden" name="redirect_to" value="/teacher/live">
-                    <div class="input-group">
-                        <input type="file" name="file" class="form-control" accept=".txt,.pptx,.pdf,.docx" required>
-                        <button type="submit" class="btn btn-warning">上传</button>
+
+    <!-- 右侧视频区 (占 3 列) -->
+    <div class="col-lg-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white"><i class="bi bi-people"></i> 课堂成员</div>
+            <div class="card-body p-2 bg-light" style="overflow-y: auto; max-height: 700px;" id="videoList">
+                
+                <!-- 老师自己的视频 -->
+                <div class="video-container mb-2 position-relative bg-dark rounded shadow-sm" style="aspect-ratio: 4/3; overflow: hidden;">
+                    <video id="localVideo" autoplay muted playsinline class="w-100 h-100 object-fit-cover" style="display: none;"></video>
+                    <div id="localVideoOff" class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50">
+                        <i class="bi bi-camera-video-off mb-1" style="font-size: 1.5rem;"></i>
+                        <span class="small">摄像头已关闭</span>
                     </div>
-                    <small class="text-muted">仅本场课堂「{{ classroom.name }}」可见。支持 .txt / .pptx / .pdf / .docx</small>
-                </form>
-                <ul class="list-group">
-                    {% for cw in courseware_list %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item text-muted text-center">暂无课件</li>
-                    {% endfor %}
-                </ul>
+                    <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
+                        <span>{{ user.username }} (老师)</span>
+                        <i id="localMicIcon" class="bi bi-mic-mute text-danger"></i>
+                    </div>
+                </div>
+
+                <!-- 学生视频占位 -->
+                <div id="studentSlot" class="video-container mb-2 position-relative bg-dark rounded shadow-sm" style="aspect-ratio: 4/3; overflow: hidden;">
+                    <div class="student-placeholder w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50">
+                        <i class="bi bi-person-bounding-box mb-1" style="font-size: 1.5rem;"></i>
+                        <span class="small">等待学生加入...</span>
+                    </div>
+                    <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
+                        <span class="student-label">等待学生</span>
+                        <i class="bi bi-mic-mute text-danger"></i>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -89,31 +146,184 @@
     const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(roomCode)}`;
     let ws = null;
 
+    let localStream = null;
+    let isCamOn = false;
+    let isMicOn = false;
+
+    let peerConnection = null;
+    let pendingCandidates = [];
+    const configuration = {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    };
+
+    // ========== WebSocket ==========
     function connectWS() {
-        if (ws) {
-            try { ws.close(); } catch (e) {}
-        }
+        if (ws) { try { ws.close(); } catch(e){} }
         ws = new WebSocket(wsUrl);
         ws.onopen = () => appendMsg("系统", "已连接到课堂（房间 " + roomCode + "）", "text-info");
-        ws.onmessage = (e) => {
+        ws.onmessage = async (e) => {
             const msg = JSON.parse(e.data);
-            if (msg.type === "system") {
-                appendMsg("系统", msg.content, "text-info");
-            } else if (msg.type === "comment") {
-                appendMsg(msg.username + "（学生评论）", msg.content, "text-success fw-bold");
-            } else if (msg.type === "subtitle") {
-                appendMsg("字幕", msg.content, "text-primary");
+            switch (msg.type) {
+                case "system":
+                    appendMsg("系统", msg.content, "text-info");
+                    if (msg.content.includes("加入了课堂") && msg.username && msg.role !== "teacher") {
+                        updateStudentSlot(msg.username, false);
+                    }
+                    if (msg.content.includes("离开了课堂") && msg.username && msg.role !== "teacher") {
+                        resetStudentSlot();
+                    }
+                    break;
+                case "comment":
+                    appendMsg(msg.username + "（学生评论）", msg.content, "text-success fw-bold");
+                    break;
+                case "subtitle":
+                    appendMsg("字幕", msg.content, "text-primary");
+                    break;
+                case "webrtc_ready":
+                    if (localStream) { await createPeerConnection(); }
+                    break;
+                case "webrtc_offer":
+                    await handleOffer(msg);
+                    break;
+                case "webrtc_answer":
+                    await handleAnswer(msg);
+                    break;
+                case "webrtc_ice":
+                    await handleNewICECandidateMsg(msg);
+                    break;
             }
         };
         ws.onclose = () => appendMsg("系统", "连接已断开", "text-danger");
-        ws.onerror = () => appendMsg("系统", "连接异常（若使用 HTTPS 页面，请确认使用 wss）", "text-danger");
+        ws.onerror = () => appendMsg("系统", "连接异常", "text-danger");
     }
 
+    // ========== 学生占位更新 ==========
+    function updateStudentSlot(username, hasVideo) {
+        const slot = document.getElementById("studentSlot");
+        if (!slot) return;
+        const label = slot.querySelector(".student-label");
+        if (label) label.textContent = username + " (学生)";
+        if (!hasVideo) {
+            const ph = slot.querySelector(".student-placeholder");
+            if (ph) {
+                ph.innerHTML = '<i class="bi bi-camera-video-off mb-1" style="font-size:1.5rem;"></i><span class="small">摄像头已关闭</span>';
+            }
+        }
+    }
+    function resetStudentSlot() {
+        const slot = document.getElementById("studentSlot");
+        if (!slot) return;
+        const label = slot.querySelector(".student-label");
+        if (label) label.textContent = "等待学生";
+        const ph = slot.querySelector(".student-placeholder");
+        if (ph) {
+            ph.innerHTML = '<i class="bi bi-person-bounding-box mb-1" style="font-size:1.5rem;"></i><span class="small">等待学生加入...</span>';
+        }
+        const vid = slot.querySelector("video");
+        if (vid) { vid.srcObject = null; vid.replaceWith(createPlaceholderDiv()); }
+    }
+    function createPlaceholderDiv() {
+        const d = document.createElement("div");
+        d.className = "student-placeholder w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50";
+        d.innerHTML = '<i class="bi bi-person-bounding-box mb-1" style="font-size:1.5rem;"></i><span class="small">等待学生加入...</span>';
+        return d;
+    }
+
+    // ========== WebRTC ==========
+    function resetPeerConnection() {
+        if (peerConnection) { peerConnection.close(); peerConnection = null; }
+        pendingCandidates = [];
+    }
+
+    function setupPeerConnection() {
+        resetPeerConnection();
+        peerConnection = new RTCPeerConnection(configuration);
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        }
+
+        peerConnection.ontrack = (event) => {
+            const slot = document.getElementById("studentSlot");
+            if (!slot) return;
+            let vid = slot.querySelector("video");
+            const ph = slot.querySelector(".student-placeholder");
+            if (!vid) {
+                vid = document.createElement("video");
+                vid.autoplay = true;
+                vid.playsInline = true;
+                vid.className = "w-100 h-100 object-fit-cover";
+                if (ph) { ph.replaceWith(vid); } else { slot.insertBefore(vid, slot.firstChild); }
+            }
+            if (vid.srcObject !== event.streams[0]) {
+                vid.srcObject = event.streams[0];
+                vid.play().catch(err => console.error("播放远端视频失败:", err));
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "webrtc_ice", candidate: event.candidate }));
+            }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+            const state = peerConnection.connectionState;
+            console.log("WebRTC 连接状态:", state);
+            if (state === "connected") appendMsg("系统", "视频连接已建立", "text-success");
+            if (state === "failed") appendMsg("系统", "视频连接失败，请双方刷新页面重试", "text-danger");
+        };
+    }
+
+    async function createPeerConnection() {
+        setupPeerConnection();
+        try {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            ws.send(JSON.stringify({ type: "webrtc_offer", offer: offer }));
+        } catch (e) { console.error("创建 Offer 失败:", e); }
+    }
+
+    async function handleOffer(msg) {
+        setupPeerConnection();
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            ws.send(JSON.stringify({ type: "webrtc_answer", answer: answer }));
+            while (pendingCandidates.length > 0) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(pendingCandidates.shift()));
+            }
+        } catch (e) { console.error("处理 Offer 失败:", e); }
+    }
+
+    async function handleAnswer(msg) {
+        if (!peerConnection) return;
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.answer));
+            while (pendingCandidates.length > 0) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(pendingCandidates.shift()));
+            }
+        } catch (e) { console.error("处理 Answer 失败:", e); }
+    }
+
+    async function handleNewICECandidateMsg(msg) {
+        if (!peerConnection) return;
+        try {
+            if (peerConnection.remoteDescription) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate));
+            } else {
+                pendingCandidates.push(msg.candidate);
+            }
+        } catch (e) { console.error("添加 ICE candidate 失败:", e); }
+    }
+
+    // ========== 消息显示 ==========
     function appendMsg(sender, content, cls) {
         const area = document.getElementById("messageArea");
         if (area.querySelector(".text-muted.text-center")) area.innerHTML = "";
         const p = document.createElement("p");
-        p.className = "mb-1";
+        p.className = "mb-1 small";
         p.innerHTML = `<span class="${cls}">[${sender}]</span> ${content}`;
         area.appendChild(p);
         area.scrollTop = area.scrollHeight;
@@ -123,25 +333,80 @@
         const input = document.getElementById("subtitleInput");
         const text = input.value.trim();
         if (!text) return;
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            appendMsg("系统", "未连接到课堂，请刷新页面重试", "text-danger");
-            return;
-        }
-        ws.send(JSON.stringify({type: "subtitle", content: text}));
+        if (!ws || ws.readyState !== WebSocket.OPEN) { appendMsg("系统", "未连接到课堂", "text-danger"); return; }
+        ws.send(JSON.stringify({ type: "subtitle", content: text }));
         input.value = "";
     });
-
-    document.getElementById("btnExitClassroom").addEventListener("click", (e) => {
-        e.preventDefault();
-        if (ws) {
-            try { ws.close(); } catch (err) {}
-            ws = null;
-        }
-        window.location.href = "/teacher";
-    });
-
     document.getElementById("subtitleInput").addEventListener("keydown", (e) => {
         if (e.key === "Enter") document.getElementById("btnSendSubtitle").click();
+    });
+
+    // ========== 麦克风与摄像头 ==========
+    async function toggleMedia() {
+        if (!localStream) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById("localVideo").srcObject = localStream;
+                localStream.getVideoTracks()[0].enabled = isCamOn;
+                localStream.getAudioTracks()[0].enabled = isMicOn;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "webrtc_ready" }));
+                }
+            } catch (err) {
+                console.error("无法获取媒体设备:", err);
+                if (isCamOn) isCamOn = false;
+                if (isMicOn) isMicOn = false;
+                if (err.name === 'NotAllowedError') {
+                    alert("权限被拒绝。请在浏览器地址栏左侧允许摄像头和麦克风权限，然后刷新页面。");
+                } else if (err.name === 'NotFoundError') {
+                    alert("未找到摄像头或麦克风设备。");
+                } else if (err.name === 'NotReadableError') {
+                    alert("设备可能被其他程序占用。");
+                } else {
+                    alert("无法访问摄像头或麦克风：" + err.message);
+                }
+                return;
+            }
+        } else {
+            localStream.getVideoTracks()[0].enabled = isCamOn;
+            localStream.getAudioTracks()[0].enabled = isMicOn;
+        }
+        updateMediaUI();
+    }
+
+    function updateMediaUI() {
+        const videoEl = document.getElementById("localVideo");
+        const videoOffEl = document.getElementById("localVideoOff");
+        const btnCam = document.getElementById("btnToggleCam");
+        const btnMic = document.getElementById("btnToggleMic");
+        const micIcon = document.getElementById("localMicIcon");
+        if (isCamOn) {
+            videoEl.style.display = "block"; videoOffEl.style.display = "none";
+            btnCam.innerHTML = '<i class="bi bi-camera-video"></i> 关闭摄像头';
+            btnCam.classList.replace("btn-outline-light", "btn-light");
+        } else {
+            videoEl.style.display = "none"; videoOffEl.style.display = "flex";
+            btnCam.innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';
+            btnCam.classList.replace("btn-light", "btn-outline-light");
+        }
+        if (isMicOn) {
+            btnMic.innerHTML = '<i class="bi bi-mic"></i> 关闭麦克风';
+            btnMic.classList.replace("btn-outline-light", "btn-light");
+            micIcon.className = "bi bi-mic-fill text-success";
+        } else {
+            btnMic.innerHTML = '<i class="bi bi-mic-mute"></i> 打开麦克风';
+            btnMic.classList.replace("btn-light", "btn-outline-light");
+            micIcon.className = "bi bi-mic-mute text-danger";
+        }
+    }
+
+    document.getElementById("btnToggleCam").addEventListener("click", () => { isCamOn = !isCamOn; toggleMedia(); });
+    document.getElementById("btnToggleMic").addEventListener("click", () => { isMicOn = !isMicOn; toggleMedia(); });
+
+    document.getElementById("btnExitClassroom").addEventListener("click", (e) => {
+        resetPeerConnection();
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+        if (ws) { try { ws.close(); } catch(err){} ws = null; }
     });
 
     connectWS();

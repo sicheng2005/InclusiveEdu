@@ -7,7 +7,7 @@
 <h2 class="mb-2"><i class="bi bi-book-half text-primary"></i> 学习端</h2>
 <p class="text-muted mb-4">您可在同一页面按需使用实时文字、评论互动与课件朗读等功能，无需在注册时做类别选择。</p>
 
-<div class="row g-4">
+<div class="row g-4 mb-3">
     <div class="col-12">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white"><i class="bi bi-door-open"></i> 加入课堂</div>
@@ -32,37 +32,97 @@
     </div>
 </div>
 
-<div class="row g-4 mt-1" id="classroomWorkspace" style="display: none;">
-    <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-info text-white"><i class="bi bi-badge-cc"></i> 实时文字与互动</div>
-            <div class="card-body">
-                <div class="input-group mb-3">
-                    <input type="text" id="commentInput" class="form-control" placeholder="输入评论或互动文字…" disabled>
-                    <button class="btn btn-outline-secondary" id="btnSendComment" disabled>发送</button>
+<div class="row g-3 mt-1" id="classroomWorkspace" style="display: none;">
+    <!-- 左侧主屏幕区 (占 9 列) -->
+    <div class="col-lg-9 d-flex flex-column gap-3">
+        
+        <!-- 课件主展示区 -->
+        <div class="card shadow-sm flex-grow-1">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-easel"></i> 课堂主屏幕</span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="btnToggleMic"><i class="bi bi-mic-mute"></i> 打开麦克风</button>
+                    <button class="btn btn-sm btn-outline-light" id="btnToggleCam"><i class="bi bi-camera-video-off"></i> 打开摄像头</button>
                 </div>
-                <small class="text-muted d-block mb-3">如需接入手语识别，可将识别结果填入上方输入框后发送。</small>
-                <div id="subtitleArea" class="border rounded p-3 bg-light" style="min-height:260px;max-height:380px;overflow-y:auto;font-size:1.05rem;">
-                    <p class="text-muted text-center mb-0">加入课堂后将显示字幕与课堂消息</p>
+            </div>
+            <!-- 主屏幕内容：展示课件 -->
+            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <div class="text-center text-white-50">
+                    <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
+                    <h4>等待老师展示课件</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部控制区：字幕与课件朗读 -->
+        <div class="row g-3">
+            <div class="col-md-7">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-info text-white"><i class="bi bi-chat-dots"></i> 实时字幕与互动</div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="input-group mb-2">
+                            <input type="text" id="commentInput" class="form-control" placeholder="输入评论或互动文字…">
+                            <button class="btn btn-outline-secondary" id="btnSendComment">发送</button>
+                        </div>
+                        <small class="text-muted d-block mb-2">如需接入手语识别，可将识别结果填入上方输入框后发送。</small>
+                        <div id="subtitleArea" class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto; font-size:1.05rem;">
+                            <p class="text-muted text-center mb-0 small mt-2">课堂消息将显示在这里...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-dark text-white"><i class="bi bi-file-earmark-text"></i> 课件文字朗读</div>
+                    <div class="card-body" style="overflow-y: auto; max-height: 250px;">
+                        <ul class="list-group list-group-flush mb-2" id="coursewareList">
+                            <li class="list-group-item text-muted text-center border-0 py-1">等待加载...</li>
+                        </ul>
+                        <div class="border rounded p-2 bg-light small mb-2" style="max-height:100px;overflow-y:auto" id="previewText" aria-live="polite">
+                            <span class="text-muted">点击课件可预览文字；支持时将以语音朗读。</span>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="autoSpeakSubtitles">
+                            <label class="form-check-label small" for="autoSpeakSubtitles">自动朗读老师发送的课堂字幕</label>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="btnStopSpeech">停止朗读</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-5">
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white"><i class="bi bi-file-earmark-text"></i> 课件文字朗读</div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush mb-3" id="coursewareList">
-                    <li class="list-group-item text-muted text-center border-0">加入课堂后显示课件列表</li>
-                </ul>
-                <div class="border rounded p-3 bg-light small" style="max-height:160px;overflow-y:auto" id="previewText" aria-live="polite">
-                    <span class="text-muted">点击课件可预览文字；支持时将以语音朗读。</span>
+
+    <!-- 右侧视频区 (占 3 列) -->
+    <div class="col-lg-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white"><i class="bi bi-people"></i> 课堂成员</div>
+            <div class="card-body p-2 bg-light" style="overflow-y: auto; max-height: 700px;" id="videoList">
+                
+                <!-- 老师的视频占位 -->
+                <div id="teacherSlot" class="video-container mb-2 position-relative bg-dark rounded shadow-sm border border-warning" style="aspect-ratio: 4/3; overflow: hidden;">
+                    <div class="teacher-placeholder w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50">
+                        <i class="bi bi-person-video3 mb-1" style="font-size: 1.5rem;"></i>
+                        <span class="small">老师未开摄像头</span>
+                    </div>
+                    <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
+                        <span class="teacher-label">老师</span>
+                        <i class="bi bi-mic-mute text-danger"></i>
+                    </div>
                 </div>
-                <div class="form-check mt-3">
-                    <input class="form-check-input" type="checkbox" id="autoSpeakSubtitles">
-                    <label class="form-check-label" for="autoSpeakSubtitles">自动朗读老师发送的课堂字幕</label>
+
+                <!-- 学生自己的视频 -->
+                <div class="video-container mb-2 position-relative bg-dark rounded shadow-sm" style="aspect-ratio: 4/3; overflow: hidden;">
+                    <video id="localVideo" autoplay muted playsinline class="w-100 h-100 object-fit-cover" style="display: none;"></video>
+                    <div id="localVideoOff" class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50">
+                        <i class="bi bi-camera-video-off mb-1" style="font-size: 1.5rem;"></i>
+                        <span class="small">摄像头已关闭</span>
+                    </div>
+                    <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
+                        <span>{{ user.username }} (学生)</span>
+                        <i id="localMicIcon" class="bi bi-mic-mute text-danger"></i>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-outline-danger btn-sm mt-2" id="btnStopSpeech">停止朗读</button>
+
             </div>
         </div>
     </div>
@@ -75,12 +135,26 @@
     let autoSpeakSubtitles = false;
     let joinedClassroomId = null;
 
+    // 音视频控制状态
+    let localStream = null;
+    let isCamOn = false;
+    let isMicOn = false;
+
+    // WebRTC 状态
+    let peerConnection = null;
+    let pendingCandidates = [];
+    const configuration = {
+        'iceServers': [
+            { 'urls': 'stun:stun.l.google.com:19302' }
+        ]
+    };
+
     function appendLine(title, body, cls) {
         const area = document.getElementById("subtitleArea");
         const placeholder = area.querySelector(".text-muted.text-center");
         if (placeholder) area.innerHTML = "";
         const p = document.createElement("p");
-        p.className = "mb-2";
+        p.className = "mb-1 small";
         p.innerHTML = `<span class="${cls || "text-dark"} fw-bold">[${title}]</span> ${body}`;
         area.appendChild(p);
         area.scrollTop = area.scrollHeight;
@@ -109,36 +183,175 @@
         const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(key)}`;
         ws = new WebSocket(wsUrl);
         ws.onopen = () => appendLine("系统", "已连接课堂（房间 " + key + "）", "text-info");
-        ws.onmessage = (e) => {
+        ws.onmessage = async (e) => {
             const msg = JSON.parse(e.data);
-            if (msg.type === "system") {
-                appendLine("系统", msg.content, "text-info");
-            } else if (msg.type === "subtitle") {
-                appendLine("字幕", msg.content, "text-primary");
-                if (autoSpeakSubtitles && msg.content) speak(msg.content);
-            } else if (msg.type === "comment") {
-                appendLine((msg.username || "同学") + " 评论", msg.content, "text-success");
-            } else {
-                appendLine("消息", typeof msg.content === "string" ? msg.content : JSON.stringify(msg), "text-secondary");
+            switch (msg.type) {
+                case "system":
+                    appendLine("系统", msg.content, "text-info");
+                    if (msg.content.includes("加入了课堂") && msg.username && msg.role === "teacher") {
+                        updateTeacherSlot(msg.username, false);
+                    }
+                    break;
+                case "subtitle":
+                    appendLine("字幕", msg.content, "text-primary");
+                    if (autoSpeakSubtitles && msg.content) speak(msg.content);
+                    break;
+                case "comment":
+                    appendLine((msg.username || "同学") + " 评论", msg.content, "text-success");
+                    break;
+                case "webrtc_ready":
+                    if (localStream) { await createPeerConnection(); }
+                    break;
+                case "webrtc_offer":
+                    await handleOffer(msg);
+                    break;
+                case "webrtc_answer":
+                    await handleAnswer(msg);
+                    break;
+                case "webrtc_ice":
+                    await handleNewICECandidateMsg(msg);
+                    break;
             }
         };
         ws.onclose = () => appendLine("系统", "连接已断开", "text-danger");
         ws.onerror = () => appendLine("系统", "连接异常", "text-danger");
     }
 
+    // ========== 老师占位更新 ==========
+    function updateTeacherSlot(username, hasVideo) {
+        const slot = document.getElementById("teacherSlot");
+        if (!slot) return;
+        const label = slot.querySelector(".teacher-label");
+        if (label) label.textContent = username + " (老师)";
+        if (!hasVideo) {
+            const ph = slot.querySelector(".teacher-placeholder");
+            if (ph) {
+                ph.innerHTML = '<i class="bi bi-camera-video-off mb-1" style="font-size:1.5rem;"></i><span class="small">摄像头已关闭</span>';
+            }
+        }
+    }
+
+    // --- WebRTC 核心逻辑 ---
+    function resetPeerConnection() {
+        if (peerConnection) { peerConnection.close(); peerConnection = null; }
+        pendingCandidates = [];
+    }
+    function setupPeerConnection() {
+        resetPeerConnection();
+        peerConnection = new RTCPeerConnection(configuration);
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        }
+
+        peerConnection.ontrack = (event) => {
+            const slot = document.getElementById("teacherSlot");
+            if (!slot) return;
+            let vid = slot.querySelector("video");
+            const ph = slot.querySelector(".teacher-placeholder");
+            if (!vid) {
+                vid = document.createElement("video");
+                vid.autoplay = true;
+                vid.playsInline = true;
+                vid.className = "w-100 h-100 object-fit-cover";
+                if (ph) { ph.replaceWith(vid); } else { slot.insertBefore(vid, slot.firstChild); }
+            }
+            if (vid.srcObject !== event.streams[0]) {
+                vid.srcObject = event.streams[0];
+                vid.play().catch(err => console.error("播放远端视频失败:", err));
+            }
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "webrtc_ice", candidate: event.candidate }));
+            }
+        };
+
+        peerConnection.onconnectionstatechange = () => {
+            const state = peerConnection.connectionState;
+            console.log("WebRTC 连接状态:", state);
+            if (state === "connected") appendLine("系统", "视频连接已建立", "text-success");
+            if (state === "failed") appendLine("系统", "视频连接失败，请双方刷新页面重试", "text-danger");
+        };
+    }
+
+    async function createPeerConnection() {
+        setupPeerConnection();
+        try {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            ws.send(JSON.stringify({
+                type: "webrtc_offer",
+                offer: offer
+            }));
+        } catch (e) {
+            console.error("创建 Offer 失败:", e);
+        }
+    }
+
+    async function handleOffer(msg) {
+        setupPeerConnection();
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            ws.send(JSON.stringify({
+                type: "webrtc_answer",
+                answer: answer
+            }));
+            // 处理缓存的 ICE 候选
+            while (pendingCandidates.length > 0) {
+                const candidate = pendingCandidates.shift();
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        } catch (e) {
+            console.error("处理 Offer 失败:", e);
+        }
+    }
+
+    async function handleAnswer(msg) {
+        if (!peerConnection) return;
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.answer));
+            // 处理缓存的 ICE 候选
+            while (pendingCandidates.length > 0) {
+                const candidate = pendingCandidates.shift();
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        } catch (e) {
+            console.error("处理 Answer 失败:", e);
+        }
+    }
+
+    async function handleNewICECandidateMsg(msg) {
+        if (!peerConnection) return;
+        try {
+            if (peerConnection.remoteDescription) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate));
+            } else {
+                // 如果还没设置远端描述，先缓存起来
+                pendingCandidates.push(msg.candidate);
+            }
+        } catch (e) {
+            console.error("添加 ICE candidate 失败:", e);
+        }
+    }
+    // --- WebRTC 逻辑结束 ---
+
     async function loadCoursewareList(items) {
         const ul = document.getElementById("coursewareList");
         ul.innerHTML = "";
         if (!items || !items.length) {
-            ul.innerHTML = '<li class="list-group-item text-muted text-center border-0">暂无课件</li>';
+            ul.innerHTML = '<li class="list-group-item text-muted text-center border-0 py-1">暂无课件</li>';
             return;
         }
         for (const cw of items) {
             const li = document.createElement("li");
-            li.className = "list-group-item list-group-item-action border-0 px-0";
+            li.className = "list-group-item list-group-item-action border-0 px-2 py-1";
             li.tabIndex = 0;
             li.setAttribute("role", "button");
-            li.textContent = cw.name;
+            li.innerHTML = `<i class="bi bi-file-earmark-text"></i> ${cw.name}`;
             li.addEventListener("click", async () => {
                 if (joinedClassroomId == null) {
                     document.getElementById("previewText").textContent = "请先加入课堂";
@@ -202,24 +415,90 @@
         input.value = "";
     }
 
+    document.getElementById("btnSendComment").addEventListener("click", sendComment);
+    document.getElementById("commentInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendComment();
+    });
+
+    // ========== 麦克风与摄像头 ==========
+    async function toggleMedia() {
+        if (!localStream) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById("localVideo").srcObject = localStream;
+                localStream.getVideoTracks()[0].enabled = isCamOn;
+                localStream.getAudioTracks()[0].enabled = isMicOn;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "webrtc_ready" }));
+                }
+            } catch (err) {
+                console.error("无法获取媒体设备:", err);
+                if (isCamOn) isCamOn = false;
+                if (isMicOn) isMicOn = false;
+                if (err.name === 'NotAllowedError') {
+                    alert("权限被拒绝。请在浏览器地址栏左侧允许摄像头和麦克风权限，然后刷新页面。");
+                } else if (err.name === 'NotFoundError') {
+                    alert("未找到摄像头或麦克风设备。");
+                } else if (err.name === 'NotReadableError') {
+                    alert("设备可能被其他程序占用。");
+                } else {
+                    alert("无法访问摄像头或麦克风：" + err.message);
+                }
+                return;
+            }
+        } else {
+            localStream.getVideoTracks()[0].enabled = isCamOn;
+            localStream.getAudioTracks()[0].enabled = isMicOn;
+        }
+        updateMediaUI();
+    }
+
+    function updateMediaUI() {
+        const videoEl = document.getElementById("localVideo");
+        const videoOffEl = document.getElementById("localVideoOff");
+        const btnCam = document.getElementById("btnToggleCam");
+        const btnMic = document.getElementById("btnToggleMic");
+        const micIcon = document.getElementById("localMicIcon");
+        if (isCamOn) {
+            videoEl.style.display = "block"; videoOffEl.style.display = "none";
+            btnCam.innerHTML = '<i class="bi bi-camera-video"></i> 关闭摄像头';
+            btnCam.classList.replace("btn-outline-light", "btn-light");
+        } else {
+            videoEl.style.display = "none"; videoOffEl.style.display = "flex";
+            btnCam.innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';
+            btnCam.classList.replace("btn-light", "btn-outline-light");
+        }
+        if (isMicOn) {
+            btnMic.innerHTML = '<i class="bi bi-mic"></i> 关闭麦克风';
+            btnMic.classList.replace("btn-outline-light", "btn-light");
+            micIcon.className = "bi bi-mic-fill text-success";
+        } else {
+            btnMic.innerHTML = '<i class="bi bi-mic-mute"></i> 打开麦克风';
+            btnMic.classList.replace("btn-light", "btn-outline-light");
+            micIcon.className = "bi bi-mic-mute text-danger";
+        }
+    }
+
+    document.getElementById("btnToggleCam").addEventListener("click", () => { isCamOn = !isCamOn; toggleMedia(); });
+    document.getElementById("btnToggleMic").addEventListener("click", () => { isMicOn = !isMicOn; toggleMedia(); });
+
     document.getElementById("btnLeaveClassroom").addEventListener("click", () => {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-        if (ws) {
-            try { ws.close(); } catch (e) {}
-            ws = null;
-        }
+        resetPeerConnection();
+        if (ws) { try { ws.close(); } catch(e){} ws = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
         joinedClassroomId = null;
+        isCamOn = false; isMicOn = false;
         document.getElementById("classroomWorkspace").style.display = "none";
         document.getElementById("joinStatusArea").style.display = "none";
         document.getElementById("joinStatus").textContent = "";
         document.getElementById("roomCodeInput").value = "";
         document.getElementById("commentInput").disabled = true;
         document.getElementById("btnSendComment").disabled = true;
-    });
-
-    document.getElementById("btnSendComment").addEventListener("click", sendComment);
-    document.getElementById("commentInput").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendComment();
+        document.getElementById("localVideo").style.display = "none";
+        document.getElementById("localVideoOff").style.display = "flex";
+        document.getElementById("btnToggleCam").innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';
+        document.getElementById("btnToggleMic").innerHTML = '<i class="bi bi-mic-mute"></i> 打开麦克风';
     });
 </script>
 {% endblock %}

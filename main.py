@@ -108,8 +108,10 @@ class ConnectionManager:
         if room_code in self.rooms:
             self.rooms[room_code] = [c for c in self.rooms[room_code] if c["ws"] is not ws]
 
-    async def broadcast(self, room_code: str, message: dict):
+    async def broadcast(self, room_code: str, message: dict, exclude_ws: WebSocket = None):
         for conn in self.rooms.get(room_code, []):
+            if exclude_ws and conn["ws"] is exclude_ws:
+                continue
             try:
                 await conn["ws"].send_text(json.dumps(message, ensure_ascii=False))
             except Exception:
@@ -466,6 +468,8 @@ async def ws_classroom(websocket: WebSocket, room_code: str):
     await manager.broadcast(room_key, {
         "type": "system",
         "content": f"{user['username']}（{ROLE_LABELS.get(user['role'], '')}）加入了课堂",
+        "username": user["username"],
+        "role": user["role"],
     })
 
     try:
@@ -474,12 +478,19 @@ async def ws_classroom(websocket: WebSocket, room_code: str):
             msg = json.loads(raw)
             msg["username"] = user["username"]
             msg["role"] = user["role"]
-            await manager.broadcast(room_key, msg)
+            
+            # WebRTC 信令消息，不广播给自己
+            if msg.get("type") in ("webrtc_offer", "webrtc_answer", "webrtc_ice", "webrtc_ready"):
+                await manager.broadcast(room_key, msg, exclude_ws=websocket)
+            else:
+                await manager.broadcast(room_key, msg)
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_key)
         await manager.broadcast(room_key, {
             "type": "system",
             "content": f"{user['username']} 离开了课堂",
+            "username": user["username"],
+            "role": user["role"],
         })
 
 # ---------------------------------------------------------------------------
