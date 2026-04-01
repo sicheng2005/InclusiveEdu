@@ -46,10 +46,12 @@
                 </div>
             </div>
             <!-- 主屏幕内容：展示课件 -->
-            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <div class="text-center text-white-50">
-                    <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
-                    <h4>等待老师展示课件</h4>
+            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; overflow: hidden;">
+                <div id="mainCoursewareArea" class="w-100 h-100 d-flex align-items-center justify-content-center">
+                    <div class="text-center text-white-50">
+                        <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
+                        <h4>等待老师展示课件</h4>
+                    </div>
                 </div>
             </div>
         </div>
@@ -106,7 +108,7 @@
                     </div>
                     <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
                         <span class="teacher-label">老师</span>
-                        <i class="bi bi-mic-mute text-danger"></i>
+                        <i id="remoteMicIcon" class="bi bi-mic-mute text-danger"></i>
                     </div>
                 </div>
 
@@ -192,6 +194,15 @@
                         updateTeacherSlot(msg.username, false);
                     }
                     break;
+                case "presence_snapshot":
+                    {
+                        const members = Array.isArray(msg.members) ? msg.members : [];
+                        const teacher = members.find(m => m && m.role === "teacher");
+                        if (teacher && teacher.username) {
+                            updateTeacherSlot(teacher.username, false);
+                        }
+                    }
+                    break;
                 case "subtitle":
                     appendLine("字幕", msg.content, "text-primary");
                     if (autoSpeakSubtitles && msg.content) speak(msg.content);
@@ -211,10 +222,78 @@
                 case "webrtc_ice":
                     await handleNewICECandidateMsg(msg);
                     break;
+                case "courseware_show":
+                    if (msg && msg.payload) {
+                        renderMainCourseware(msg.payload);
+                    }
+                    break;
+                case "media_status":
+                    if (msg.role === "teacher") {
+                        const remoteMic = document.getElementById("remoteMicIcon");
+                        if (remoteMic) {
+                            if (msg.mic) {
+                                remoteMic.className = "bi bi-mic-fill text-success";
+                            } else {
+                                remoteMic.className = "bi bi-mic-mute text-danger";
+                            }
+                        }
+                    }
+                    break;
             }
         };
         ws.onclose = () => appendLine("系统", "连接已断开", "text-danger");
         ws.onerror = () => appendLine("系统", "连接异常", "text-danger");
+    }
+
+    // ========== 课件展示（主屏幕） ==========
+    function escapeHtml(s) {
+        return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function renderMainCourseware(payload) {
+        const area = document.getElementById("mainCoursewareArea");
+        if (!area) return;
+        const data = payload || {};
+        const mode = String(data.mode || "text");
+        const safeName = escapeHtml(data.name || "课件");
+        const safeText = escapeHtml(data.text || "");
+        const fileUrl = data.file_url ? String(data.file_url) : "";
+        const originalUrl = fileUrl ? fileUrl.replace("variant=preview", "variant=original").replace("variant=auto", "variant=original") : "";
+        area.className = "w-100 h-100";
+        if (mode === "pdf" && fileUrl) {
+            const viewerUrl = `${fileUrl}#toolbar=1&navpanes=1&view=FitH`;
+            area.innerHTML = `
+                <div class="h-100 w-100 p-2 d-flex flex-column">
+                    <div class="d-flex align-items-center justify-content-between mb-2 text-white">
+                        <div class="fw-bold text-truncate" title="${safeName}">
+                            <i class="bi bi-file-earmark-pdf"></i> ${safeName}
+                        </div>
+                        <div>
+                            <a href="${originalUrl}" target="_blank" class="btn btn-sm btn-success me-2"><i class="bi bi-download"></i> 下载原件</a>
+                            <a href="${fileUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">新窗口打开</a>
+                        </div>
+                    </div>
+                    <iframe src="${viewerUrl}" class="w-100 flex-grow-1 border rounded bg-white" title="${safeName}" style="min-height:380px;"></iframe>
+                </div>
+            `;
+            return;
+        }
+        area.innerHTML = `
+            <div class="h-100 w-100 p-3" style="overflow:auto;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="text-white fw-bold text-truncate" title="${safeName}">
+                        <i class="bi bi-file-earmark-text"></i> ${safeName}
+                    </div>
+                    <div>
+                        ${originalUrl ? `<a href="${originalUrl}" target="_blank" class="btn btn-sm btn-success me-2"><i class="bi bi-download"></i> 下载原件</a>` : ''}
+                        <span class="badge bg-dark">文本模式</span>
+                    </div>
+                </div>
+                <div class="bg-light rounded p-3" style="white-space: pre-wrap; line-height: 1.65;">
+                    ${safeText || "<span class='text-muted'>（该课件暂无可展示文本）</span>"}
+                </div>
+            </div>
+        `;
     }
 
     // ========== 老师占位更新 ==========
@@ -348,10 +427,13 @@
         }
         for (const cw of items) {
             const li = document.createElement("li");
-            li.className = "list-group-item list-group-item-action border-0 px-2 py-1";
+            li.className = "list-group-item list-group-item-action border-0 px-2 py-1 d-flex justify-content-between align-items-center";
             li.tabIndex = 0;
             li.setAttribute("role", "button");
-            li.innerHTML = `<i class="bi bi-file-earmark-text"></i> ${cw.name}`;
+            li.innerHTML = `
+                <span class="text-truncate" style="max-width: 70%;"><i class="bi bi-file-earmark-text"></i> ${cw.name}</span>
+                <a href="/api/courseware/${cw.id}/file?classroom_id=${encodeURIComponent(joinedClassroomId)}&variant=original" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size: 0.75rem;" title="下载原件" onclick="event.stopPropagation()"><i class="bi bi-download"></i></a>
+            `;
             li.addEventListener("click", async () => {
                 if (joinedClassroomId == null) {
                     document.getElementById("previewText").textContent = "请先加入课堂";
@@ -476,6 +558,9 @@
             btnMic.innerHTML = '<i class="bi bi-mic-mute"></i> 打开麦克风';
             btnMic.classList.replace("btn-light", "btn-outline-light");
             micIcon.className = "bi bi-mic-mute text-danger";
+        }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "media_status", mic: isMicOn, cam: isCamOn }));
         }
     }
 

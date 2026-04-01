@@ -47,11 +47,13 @@
                 </div>
             </div>
             <!-- 主屏幕内容：展示课件 -->
-            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <div class="text-center text-white-50">
-                    <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
-                    <h4>课件展示区</h4>
-                    <p>学生端将同步看到此区域的课件内容</p>
+            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; overflow: hidden;">
+                <div id="mainCoursewareArea" class="w-100 h-100 d-flex align-items-center justify-content-center">
+                    <div class="text-center text-white-50">
+                        <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
+                        <h4>课件展示区</h4>
+                        <p>点击右下角「展示」后，学生端将同步看到此区域内容</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -86,11 +88,25 @@
                                 <button type="submit" class="btn btn-warning">上传</button>
                             </div>
                         </form>
-                        <ul class="list-group list-group-sm">
+                        <ul class="list-group list-group-sm" id="coursewareManageList">
                             {% for cw in courseware_list %}
                             <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
-                                <span class="text-truncate" style="max-width: 80%;" title="{{ cw.original_name }}"><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
-                                <button class="btn btn-xs btn-outline-primary py-0 px-1" style="font-size: 0.75rem;">展示</button>
+                                <span class="text-truncate" style="max-width: 60%;" title="{{ cw.original_name }}"><i class="bi bi-file-earmark-text"></i> {{ cw.original_name }}</span>
+                                <div class="d-flex gap-1">
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs btn-outline-primary py-0 px-1 btnShowCourseware"
+                                        style="font-size: 0.75rem;"
+                                        data-cw-id="{{ cw.id }}"
+                                        data-cw-name="{{ cw.original_name|e }}"
+                                    >展示</button>
+                                    <a href="/api/courseware/{{ cw.id }}/file?classroom_id={{ classroom.id }}&variant=original" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size: 0.75rem;" title="下载原件"><i class="bi bi-download"></i></a>
+                                    <form method="post" action="/delete-courseware" class="d-inline" onsubmit="return confirm('确定删除该课件吗？');">
+                                        <input type="hidden" name="cw_id" value="{{ cw.id }}">
+                                        <input type="hidden" name="redirect_to" value="/teacher/live">
+                                        <button type="submit" class="btn btn-xs btn-outline-danger py-0 px-1" style="font-size: 0.75rem;" title="删除"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
                             </li>
                             {% else %}
                             <li class="list-group-item text-muted text-center py-1">暂无课件</li>
@@ -129,7 +145,7 @@
                     </div>
                     <div class="position-absolute bottom-0 start-0 w-100 p-1 bg-dark bg-opacity-75 text-white text-truncate d-flex justify-content-between align-items-center" style="font-size: 0.8rem;">
                         <span class="student-label">等待学生</span>
-                        <i class="bi bi-mic-mute text-danger"></i>
+                        <i id="remoteMicIcon" class="bi bi-mic-mute text-danger"></i>
                     </div>
                 </div>
 
@@ -142,6 +158,7 @@
 {% block extra_js %}
 <script>
     const roomCode = "{{ classroom.room_code }}".trim().toUpperCase();
+    const classroomId = Number("{{ classroom.id }}");
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(roomCode)}`;
     let ws = null;
@@ -173,6 +190,17 @@
                         resetStudentSlot();
                     }
                     break;
+                case "presence_snapshot":
+                    {
+                        const members = Array.isArray(msg.members) ? msg.members : [];
+                        const student = members.find(m => m && m.role !== "teacher");
+                        if (student && student.username) {
+                            updateStudentSlot(student.username, false);
+                        } else {
+                            resetStudentSlot();
+                        }
+                    }
+                    break;
                 case "comment":
                     appendMsg(msg.username + "（学生评论）", msg.content, "text-success fw-bold");
                     break;
@@ -191,10 +219,104 @@
                 case "webrtc_ice":
                     await handleNewICECandidateMsg(msg);
                     break;
+                case "courseware_show":
+                    if (msg && msg.payload) {
+                        renderMainCourseware(msg.payload);
+                    }
+                    break;
+                case "media_status":
+                    if (msg.role !== "teacher") {
+                        const remoteMic = document.getElementById("remoteMicIcon");
+                        if (remoteMic) {
+                            if (msg.mic) {
+                                remoteMic.className = "bi bi-mic-fill text-success";
+                            } else {
+                                remoteMic.className = "bi bi-mic-mute text-danger";
+                            }
+                        }
+                    }
+                    break;
             }
         };
         ws.onclose = () => appendMsg("系统", "连接已断开", "text-danger");
         ws.onerror = () => appendMsg("系统", "连接异常", "text-danger");
+    }
+
+    // ========== 课件展示（主屏幕） ==========
+    function escapeHtml(s) {
+        return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function renderMainCourseware(payload) {
+        const area = document.getElementById("mainCoursewareArea");
+        if (!area) return;
+        const data = payload || {};
+        const mode = String(data.mode || "text");
+        const safeName = escapeHtml(data.name || "课件");
+        const safeText = escapeHtml(data.text || "");
+        const fileUrl = data.file_url ? String(data.file_url) : "";
+        const originalUrl = fileUrl ? fileUrl.replace("variant=preview", "variant=original").replace("variant=auto", "variant=original") : "";
+        area.className = "w-100 h-100";
+        if (mode === "pdf" && fileUrl) {
+            const viewerUrl = `${fileUrl}#toolbar=1&navpanes=1&view=FitH`;
+            area.innerHTML = `
+                <div class="h-100 w-100 p-2 d-flex flex-column">
+                    <div class="d-flex align-items-center justify-content-between mb-2 text-white">
+                        <div class="fw-bold text-truncate" title="${safeName}">
+                            <i class="bi bi-file-earmark-pdf"></i> ${safeName}
+                        </div>
+                        <div>
+                            <a href="${fileUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">新窗口打开</a>
+                        </div>
+                    </div>
+                    <iframe src="${viewerUrl}" class="w-100 flex-grow-1 border rounded bg-white" title="${safeName}" style="min-height:380px;"></iframe>
+                </div>
+            `;
+            return;
+        }
+        area.innerHTML = `
+            <div class="h-100 w-100 p-3" style="overflow:auto;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="text-white fw-bold text-truncate" title="${safeName}">
+                        <i class="bi bi-file-earmark-text"></i> ${safeName}
+                    </div>
+                    <div>
+                        <span class="badge bg-dark">文本模式</span>
+                    </div>
+                </div>
+                <div class="bg-light rounded p-3" style="white-space: pre-wrap; line-height: 1.65;">
+                    ${safeText || "<span class='text-muted'>（该课件暂无可展示文本）</span>"}
+                </div>
+            </div>
+        `;
+    }
+
+    async function showCourseware(cwId, cwName, btnEl) {
+        const id = Number(cwId);
+        if (!id) return;
+        const btn = btnEl;
+        const oldText = btn ? btn.textContent : "";
+        if (btn) { btn.disabled = true; btn.textContent = "加载中"; }
+        try {
+            const res = await fetch(`/api/courseware/${encodeURIComponent(id)}/display?classroom_id=${encodeURIComponent(classroomId)}`, {
+                credentials: "same-origin"
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                appendMsg("系统", (data && (data.error || data.detail)) || "课件加载失败", "text-danger");
+                return;
+            }
+            if (!data.name) data.name = cwName || "课件";
+            renderMainCourseware(data);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "courseware_show", cw_id: id, payload: data }));
+            }
+        } catch (e) {
+            console.error("展示课件失败:", e);
+            appendMsg("系统", "展示课件失败，请稍后重试", "text-danger");
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = oldText || "展示"; }
+        }
     }
 
     // ========== 学生占位更新 ==========
@@ -398,6 +520,9 @@
             btnMic.classList.replace("btn-light", "btn-outline-light");
             micIcon.className = "bi bi-mic-mute text-danger";
         }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "media_status", mic: isMicOn, cam: isCamOn }));
+        }
     }
 
     document.getElementById("btnToggleCam").addEventListener("click", () => { isCamOn = !isCamOn; toggleMedia(); });
@@ -407,6 +532,13 @@
         resetPeerConnection();
         if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
         if (ws) { try { ws.close(); } catch(err){} ws = null; }
+    });
+
+    // 绑定“展示”按钮
+    document.querySelectorAll(".btnShowCourseware").forEach(btn => {
+        btn.addEventListener("click", () => {
+            showCourseware(btn.dataset.cwId, btn.dataset.cwName, btn);
+        });
     });
 
     connectWS();
