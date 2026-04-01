@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import hashlib
+import re
 
 from fastapi import (
     FastAPI, Request, Form, UploadFile, File, Query,
@@ -20,6 +21,8 @@ from database import (
     get_classrooms_by_teacher, get_classroom_by_id_and_teacher, end_classroom_for_teacher,
     session_create, session_get_user_id, session_delete,
 )
+from core_models.sign_model import recognize_sign, recognize_sign_video
+from core_models.stt_model import speech_to_text
 
 app = FastAPI(title="无障碍线上教学辅助平台")
 
@@ -134,12 +137,12 @@ async def startup():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "user": _current_user(request)})
+    return templates.TemplateResponse(request, "index.html", {"request": request, "user": _current_user(request)})
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(request, "login.html", {"request": request, "error": None})
 
 
 @app.post("/login")
@@ -149,10 +152,10 @@ async def login(
     password: str = Form(None)
 ):
     if not username or not password:
-        return templates.TemplateResponse("login.html", {"request": request, "error": "请填写用户名和密码"})
+        return templates.TemplateResponse(request, "login.html", {"request": request, "error": "请填写用户名和密码"})
     user = get_user_by_username(username)
     if not user or not _verify_pw(password, user["password_hash"]):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "用户名或密码错误"})
+        return templates.TemplateResponse(request, "login.html", {"request": request, "error": "用户名或密码错误"})
 
     sid = str(uuid.uuid4())
     session_create(sid, user["id"])
@@ -170,7 +173,7 @@ async def login(
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "error": None})
+    return templates.TemplateResponse(request, "register.html", {"request": request, "error": None})
 
 
 @app.post("/register")
@@ -181,15 +184,15 @@ async def register(
     role: str = Form(None)
 ):
     if not username or not password or not role:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "请填写完整信息"})
+        return templates.TemplateResponse(request, "register.html", {"request": request, "error": "请填写完整信息"})
     if len(username) < 2 or len(password) < 4:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "用户名至少 2 字符，密码至少 4 字符"})
+        return templates.TemplateResponse(request, "register.html", {"request": request, "error": "用户名至少 2 字符，密码至少 4 字符"})
     if role not in ("teacher", "student"):
-        return templates.TemplateResponse("register.html", {"request": request, "error": "请选择「老师」或「学生」"})
+        return templates.TemplateResponse(request, "register.html", {"request": request, "error": "请选择「老师」或「学生」"})
 
     ok = create_user(username, _hash_pw(password), role)
     if not ok:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "用户名已存在"})
+        return templates.TemplateResponse(request, "register.html", {"request": request, "error": "用户名已存在"})
     return RedirectResponse(url="/login", status_code=303)
 
 
@@ -225,7 +228,7 @@ async def teacher_page(request: Request):
             "cw_count": len(get_courseware_by_classroom(row["id"])),
         })
     cw_active = get_courseware_by_classroom(active["id"]) if active else []
-    return templates.TemplateResponse("teacher.html", {
+    return templates.TemplateResponse(request, "teacher.html", {
         "request": request,
         "user": user,
         "courseware_list": cw_active,
@@ -244,7 +247,7 @@ async def teacher_live_page(request: Request):
     if not classroom:
         return RedirectResponse(url="/teacher", status_code=303)
     tid = user["id"]
-    return templates.TemplateResponse("teacher_live.html", {
+    return templates.TemplateResponse(request, "teacher_live.html", {
         "request": request,
         "user": user,
         "classroom": classroom,
@@ -333,7 +336,7 @@ async def student_page(request: Request):
     user = _current_user(request)
     if not _is_student(user):
         return RedirectResponse(url="/login")
-    return templates.TemplateResponse("student.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "student.html", {"request": request, "user": user})
 
 
 @app.get("/deaf-student")
@@ -357,6 +360,16 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str = Field(..., description="用户名")
     password: str = Field(..., description="密码")
+
+
+class RecognitionTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="识别结果文本或回退输入")
+
+
+def _clean_recognition_text(text: str) -> str:
+    text = (text or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 @app.post("/api/register", summary="用户注册接口")
 async def api_register(req: RegisterRequest):
@@ -444,6 +457,115 @@ async def api_courseware_text(
     if not cw or cw["classroom_id"] is None or int(cw["classroom_id"]) != int(classroom_id):
         return JSONResponse({"error": "课件不存在或无权访问"}, status_code=404)
     return JSONResponse({"text": cw["text_content"], "name": cw["original_name"]})
+
+
+@app.post("/api/recognize/speech")
+async def api_recognize_speech(
+    request: Request,
+    text: str = Form(None),
+    audio: UploadFile | None = File(None),
+):
+    user = _current_user(request)
+    if not user or user["role"] != "teacher":
+        return JSONResponse({"success": False, "error": "仅老师可使用语音识别"}, status_code=403)
+
+    recognized_text = _clean_recognition_text(text)
+    saved_path = None
+    try:
+        if audio and audio.filename:
+            ext = os.path.splitext(audio.filename)[1] or ".webm"
+            saved_name = f"speech_{uuid.uuid4().hex}{ext}"
+            saved_path = os.path.join(UPLOAD_DIR, saved_name)
+            with open(saved_path, "wb") as f:
+                f.write(await audio.read())
+            recognized_text = speech_to_text(saved_path)
+
+        if not recognized_text:
+            return JSONResponse({"success": False, "error": "未获取到可识别的语音内容"}, status_code=400)
+
+        return JSONResponse({
+            "success": True,
+            "text": _clean_recognition_text(recognized_text),
+        })
+    finally:
+        if saved_path and os.path.exists(saved_path):
+            os.remove(saved_path)
+
+
+@app.post("/api/recognize/sign")
+async def api_recognize_sign(
+    request: Request,
+    text: str = Form(None),
+    image: UploadFile | None = File(None),
+    video: UploadFile | None = File(None),
+):
+    user = _current_user(request)
+    if not _is_student(user):
+        return JSONResponse({"success": False, "error": "仅学生可使用手语识别"}, status_code=403)
+
+    recognized_text = _clean_recognition_text(text)
+    saved_path = None
+    try:
+        if video and video.filename:
+            ext = os.path.splitext(video.filename)[1] or ".webm"
+            saved_name = f"sign_{uuid.uuid4().hex}{ext}"
+            saved_path = os.path.join(UPLOAD_DIR, saved_name)
+            with open(saved_path, "wb") as f:
+                f.write(await video.read())
+            sign_result = recognize_sign_video(saved_path)
+            recognized_text = _clean_recognition_text(sign_result.get("text", ""))
+            note = sign_result.get("note", "")
+            label = sign_result.get("label", "")
+            confidence = float(sign_result.get("confidence", 0.0))
+            action = sign_result.get("action", "append")
+            samples = int(sign_result.get("samples", 0))
+        elif image and image.filename:
+            ext = os.path.splitext(image.filename)[1] or ".png"
+            saved_name = f"sign_{uuid.uuid4().hex}{ext}"
+            saved_path = os.path.join(UPLOAD_DIR, saved_name)
+            with open(saved_path, "wb") as f:
+                f.write(await image.read())
+            sign_result = recognize_sign(saved_path)
+            recognized_text = _clean_recognition_text(sign_result.get("text", ""))
+            note = sign_result.get("note", "")
+            label = sign_result.get("label", "")
+            confidence = float(sign_result.get("confidence", 0.0))
+            action = sign_result.get("action", "append")
+        else:
+            sign_result = {
+                "text": recognized_text,
+                "label": "manual",
+                "confidence": 1.0 if recognized_text else 0.0,
+                "action": "append",
+                "note": "手动输入",
+            }
+            note = sign_result["note"]
+            label = sign_result["label"]
+            confidence = sign_result["confidence"]
+            action = sign_result["action"]
+            samples = 1
+
+        if not recognized_text and action in ("noop", "append"):
+            return JSONResponse({
+                "success": False,
+                "error": note or "未获取到可识别的手语内容",
+                "label": label,
+                "confidence": confidence,
+                "samples": samples,
+            }, status_code=400)
+
+        return JSONResponse({
+            "success": True,
+            "text": recognized_text,
+            "label": label,
+            "confidence": confidence,
+            "action": action,
+            "note": note,
+            "samples": samples,
+        })
+    finally:
+        if saved_path and os.path.exists(saved_path):
+            os.remove(saved_path)
 
 # ---------------------------------------------------------------------------
 # WebSocket 实时课堂

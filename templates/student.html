@@ -51,6 +51,10 @@
                     <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
                     <h4>等待老师展示课件</h4>
                 </div>
+                <div id="teacherSpeechDisplay" class="position-absolute bottom-0 start-0 w-100 p-4 bg-dark bg-opacity-50 text-white" style="backdrop-filter: blur(4px);">
+                    <div class="small text-uppercase opacity-75 mb-1">老师当前发言</div>
+                    <div class="fs-3 fw-semibold" id="teacherSpeechText">等待老师发送字幕...</div>
+                </div>
             </div>
         </div>
 
@@ -64,7 +68,35 @@
                             <input type="text" id="commentInput" class="form-control" placeholder="输入评论或互动文字…">
                             <button class="btn btn-outline-secondary" id="btnSendComment">发送</button>
                         </div>
-                        <small class="text-muted d-block mb-2">如需接入手语识别，可将识别结果填入上方输入框后发送。</small>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button class="btn btn-outline-success btn-sm" id="btnRecognizeSign" type="button">
+                                <i class="bi bi-camera"></i> 识别当前手语
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnClearSignBuffer" type="button">
+                                <i class="bi bi-eraser"></i> 清空手势码
+                            </button>
+                            <span class="small text-muted align-self-center" id="signRecognitionStatus">打开摄像头后可录制短视频片段；当前接入的是固定短句演示模式。</span>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="fixedPhraseMode" checked>
+                            <label class="form-check-label small" for="fixedPhraseMode">启用固定短句识别模式</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="autoSendRecognizedComment">
+                            <label class="form-check-label small" for="autoSendRecognizedComment">识别后自动发送到老师端</label>
+                        </div>
+                        <div class="border rounded p-2 bg-white small mb-2">
+                            <div class="fw-semibold mb-1">演示短句码</div>
+                            <div class="d-flex flex-wrap gap-2" id="phraseLegend">
+                                <span class="badge text-bg-light">LS = 老师好</span>
+                                <span class="badge text-bg-light">WY = 我有问题</span>
+                                <span class="badge text-bg-light">CQ = 请重复一遍</span>
+                                <span class="badge text-bg-light">BT = 我没听清</span>
+                                <span class="badge text-bg-light">XX = 谢谢老师</span>
+                                <span class="badge text-bg-light">KS = 可以开始了吗</span>
+                            </div>
+                            <div class="text-muted mt-2" id="phraseModeStatus">当前手势码缓冲区：空</div>
+                        </div>
                         <div id="subtitleArea" class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto; font-size:1.05rem;">
                             <p class="text-muted text-center mb-0 small mt-2">课堂消息将显示在这里...</p>
                         </div>
@@ -139,6 +171,8 @@
     let localStream = null;
     let isCamOn = false;
     let isMicOn = false;
+    let signRecorder = null;
+    let signChunks = [];
 
     // WebRTC 状态
     let peerConnection = null;
@@ -148,6 +182,151 @@
             { 'urls': 'stun:stun.l.google.com:19302' }
         ]
     };
+    const fixedPhraseMap = {
+        LS: "老师好",
+        WY: "我有问题",
+        CQ: "请重复一遍",
+        BT: "我没听清",
+        XX: "谢谢老师",
+        KS: "可以开始了吗"
+    };
+
+    function getLetterBuffer() {
+        return (document.getElementById("commentInput").value || "").toUpperCase().replace(/[^A-Z]/g, "");
+    }
+
+    function updatePhraseModeStatus(message) {
+        document.getElementById("phraseModeStatus").textContent = message;
+    }
+
+    function updateTeacherSpeechDisplay(text) {
+        document.getElementById("teacherSpeechText").textContent = text || "等待老师发送字幕...";
+    }
+
+    function syncPhraseModeHint() {
+        const code = getLetterBuffer();
+        if (!code) {
+            updatePhraseModeStatus("当前手势码缓冲区：空");
+            return;
+        }
+        if (fixedPhraseMap[code]) {
+            updatePhraseModeStatus(`当前手势码缓冲区：${code}，匹配短句“${fixedPhraseMap[code]}”`);
+            return;
+        }
+        const partialMatches = Object.keys(fixedPhraseMap).filter((key) => key.startsWith(code));
+        if (partialMatches.length) {
+            updatePhraseModeStatus(`当前手势码缓冲区：${code}，继续识别可匹配 ${partialMatches.join(" / ")}`);
+            return;
+        }
+        updatePhraseModeStatus(`当前手势码缓冲区：${code}，暂未匹配预设短句`);
+    }
+
+    function applyRecognizedSignResult(data) {
+        const input = document.getElementById("commentInput");
+        const current = input.value || "";
+        switch (data.action) {
+            case "append":
+                input.value = current + (data.text || "");
+                break;
+            case "space":
+                input.value = current + " ";
+                break;
+            case "delete":
+                input.value = current.slice(0, -1);
+                break;
+            default:
+                break;
+        }
+        syncPhraseModeHint();
+    }
+
+    function tryResolveFixedPhrase() {
+        if (!document.getElementById("fixedPhraseMode").checked) return null;
+        const code = getLetterBuffer();
+        const phrase = fixedPhraseMap[code];
+        if (!phrase) return null;
+        document.getElementById("commentInput").value = phrase;
+        updatePhraseModeStatus(`已将手势码 ${code} 映射为短句“${phrase}”`);
+        return phrase;
+    }
+
+    async function recognizeSignFromVideoClip() {
+        const statusEl = document.getElementById("signRecognitionStatus");
+        if (!localStream || !isCamOn) {
+            statusEl.textContent = "请先打开摄像头，再进行手语识别。";
+            return;
+        }
+
+        const videoTracks = localStream.getVideoTracks();
+        if (!videoTracks.length) {
+            statusEl.textContent = "当前没有可用的视频轨道。";
+            return;
+        }
+
+        if (!window.MediaRecorder) {
+            statusEl.textContent = "当前浏览器不支持视频片段录制。";
+            return;
+        }
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+            ? "video/webm;codecs=vp8"
+            : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
+
+        signChunks = [];
+        signRecorder = mimeType
+            ? new MediaRecorder(new MediaStream(videoTracks), { mimeType })
+            : new MediaRecorder(new MediaStream(videoTracks));
+
+        signRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) signChunks.push(event.data);
+        };
+
+        signRecorder.onerror = () => {
+            statusEl.textContent = "视频录制失败，请检查摄像头权限。";
+        };
+
+        signRecorder.onstop = async () => {
+            const recordedType = signRecorder.mimeType || (signChunks[0] && signChunks[0].type) || "video/webm";
+            const blob = new Blob(signChunks, { type: recordedType });
+            if (!blob.size) {
+                statusEl.textContent = "未录到有效手势片段，请重试。";
+                return;
+            }
+
+            const ext = recordedType.includes("mp4") ? "mp4" : "webm";
+            const fd = new FormData();
+            fd.append("video", blob, "sign-clip." + ext);
+            statusEl.textContent = "正在分析短视频手势片段...";
+            const res = await fetch("/api/recognize/sign", {
+                method: "POST",
+                body: fd,
+                credentials: "same-origin"
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                statusEl.textContent = data.error || "手语识别失败";
+                return;
+            }
+
+            applyRecognizedSignResult(data);
+            const resolvedPhrase = tryResolveFixedPhrase();
+            const confidenceText = typeof data.confidence === "number" ? `，置信度 ${(data.confidence * 100).toFixed(1)}%` : "";
+            const sampleText = data.samples ? `，采样帧 ${data.samples}` : "";
+            statusEl.textContent = resolvedPhrase
+                ? `已识别固定短句“${resolvedPhrase}”`
+                : (data.note || "识别完成") + `（${data.label || "unknown"}${confidenceText}${sampleText}）`;
+            if (document.getElementById("autoSendRecognizedComment").checked) {
+                sendComment();
+            }
+        };
+
+        statusEl.textContent = "正在录制 2 秒手势片段...";
+        signRecorder.start();
+        window.setTimeout(() => {
+            if (signRecorder && signRecorder.state !== "inactive") {
+                signRecorder.stop();
+            }
+        }, 2000);
+    }
 
     function appendLine(title, body, cls) {
         const area = document.getElementById("subtitleArea");
@@ -194,6 +373,7 @@
                     break;
                 case "subtitle":
                     appendLine("字幕", msg.content, "text-primary");
+                    updateTeacherSpeechDisplay(msg.content);
                     if (autoSpeakSubtitles && msg.content) speak(msg.content);
                     break;
                 case "comment":
@@ -416,18 +596,27 @@
     }
 
     document.getElementById("btnSendComment").addEventListener("click", sendComment);
+    document.getElementById("btnRecognizeSign").addEventListener("click", recognizeSignFromVideoClip);
+    document.getElementById("btnClearSignBuffer").addEventListener("click", () => {
+        document.getElementById("commentInput").value = "";
+        updatePhraseModeStatus("当前手势码缓冲区：空");
+        document.getElementById("signRecognitionStatus").textContent = "已清空当前手势码缓冲区。";
+    });
     document.getElementById("commentInput").addEventListener("keydown", (e) => {
         if (e.key === "Enter") sendComment();
     });
+    document.getElementById("commentInput").addEventListener("input", syncPhraseModeHint);
 
     // ========== 麦克风与摄像头 ==========
     async function toggleMedia() {
         if (!localStream) {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const constraints = { video: isCamOn, audio: isMicOn };
+                if (!constraints.video && !constraints.audio) return;
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 document.getElementById("localVideo").srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = isCamOn;
-                localStream.getAudioTracks()[0].enabled = isMicOn;
+                if (localStream.getVideoTracks()[0]) localStream.getVideoTracks()[0].enabled = isCamOn;
+                if (localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = isMicOn;
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: "webrtc_ready" }));
                 }
@@ -447,8 +636,14 @@
                 return;
             }
         } else {
-            localStream.getVideoTracks()[0].enabled = isCamOn;
-            localStream.getAudioTracks()[0].enabled = isMicOn;
+            const needNewTrack = (isCamOn && !localStream.getVideoTracks()[0]) || (isMicOn && !localStream.getAudioTracks()[0]);
+            if (needNewTrack) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+                return toggleMedia();
+            }
+            if (localStream.getVideoTracks()[0]) localStream.getVideoTracks()[0].enabled = isCamOn;
+            if (localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = isMicOn;
         }
         updateMediaUI();
     }
@@ -495,6 +690,8 @@
         document.getElementById("roomCodeInput").value = "";
         document.getElementById("commentInput").disabled = true;
         document.getElementById("btnSendComment").disabled = true;
+        updatePhraseModeStatus("当前手势码缓冲区：空");
+        document.getElementById("signRecognitionStatus").textContent = "打开摄像头后可录制短视频片段；当前接入的是固定短句演示模式。";
         document.getElementById("localVideo").style.display = "none";
         document.getElementById("localVideoOff").style.display = "flex";
         document.getElementById("btnToggleCam").innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';

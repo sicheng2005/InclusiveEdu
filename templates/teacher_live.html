@@ -53,6 +53,10 @@
                     <h4>课件展示区</h4>
                     <p>学生端将同步看到此区域的课件内容</p>
                 </div>
+                <div id="teacherSpeechDisplay" class="position-absolute bottom-0 start-0 w-100 p-4 bg-dark bg-opacity-50 text-white" style="backdrop-filter: blur(4px);">
+                    <div class="small text-uppercase opacity-75 mb-1">老师当前发言</div>
+                    <div class="fs-3 fw-semibold" id="teacherSpeechText">等待老师发送字幕...</div>
+                </div>
             </div>
         </div>
 
@@ -67,6 +71,19 @@
                                 <input type="text" id="subtitleInput" class="form-control" placeholder="输入授课文字或语音识别结果...">
                                 <button class="btn btn-primary" id="btnSendSubtitle">发送字幕</button>
                             </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button class="btn btn-outline-primary btn-sm" id="btnStartSpeechRecognition" type="button">
+                                <i class="bi bi-mic"></i> 开始语音识别
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnStopSpeechRecognition" type="button" disabled>
+                                <i class="bi bi-stop-circle"></i> 停止识别
+                            </button>
+                            <span class="small text-muted align-self-center" id="speechRecognitionStatus">可将识别结果直接回填到字幕框。</span>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="autoSendRecognizedSubtitle" checked>
+                            <label class="form-check-label small" for="autoSendRecognizedSubtitle">识别完成后自动发送为课堂字幕</label>
                         </div>
                         <div class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto;" id="messageArea">
                             <p class="text-muted text-center small mt-2">课堂消息将显示在这里...</p>
@@ -132,6 +149,10 @@
                         <i class="bi bi-mic-mute text-danger"></i>
                     </div>
                 </div>
+                <div class="border rounded bg-white p-2 small mb-2">
+                    <div class="fw-semibold text-muted mb-1">学生手语内容</div>
+                    <div id="studentSignDisplay" class="fs-6 text-dark">等待学生发起互动...</div>
+                </div>
 
             </div>
         </div>
@@ -145,6 +166,8 @@
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws/classroom/${encodeURIComponent(roomCode)}`;
     let ws = null;
+    let speechRecorder = null;
+    let speechChunks = [];
 
     let localStream = null;
     let isCamOn = false;
@@ -175,9 +198,11 @@
                     break;
                 case "comment":
                     appendMsg(msg.username + "（学生评论）", msg.content, "text-success fw-bold");
+                    updateStudentSignDisplay(msg.content);
                     break;
                 case "subtitle":
                     appendMsg("字幕", msg.content, "text-primary");
+                    updateTeacherSpeechDisplay(msg.content);
                     break;
                 case "webrtc_ready":
                     if (localStream) { await createPeerConnection(); }
@@ -221,6 +246,7 @@
         }
         const vid = slot.querySelector("video");
         if (vid) { vid.srcObject = null; vid.replaceWith(createPlaceholderDiv()); }
+        updateStudentSignDisplay("");
     }
     function createPlaceholderDiv() {
         const d = document.createElement("div");
@@ -329,13 +355,124 @@
         area.scrollTop = area.scrollHeight;
     }
 
-    document.getElementById("btnSendSubtitle").addEventListener("click", () => {
+    function updateTeacherSpeechDisplay(text) {
+        document.getElementById("teacherSpeechText").textContent = text || "等待老师发送字幕...";
+    }
+
+    function updateStudentSignDisplay(text) {
+        document.getElementById("studentSignDisplay").textContent = text || "等待学生发起互动...";
+    }
+
+    async function uploadRecordedSpeech(audioBlob) {
+        const fd = new FormData();
+        const ext = audioBlob.type.includes("mp4") ? "mp4" : "webm";
+        fd.append("audio", audioBlob, "teacher-speech." + ext);
+        const res = await fetch("/api/recognize/speech", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin"
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || "语音识别失败");
+        }
+        return data.text || "";
+    }
+
+    function sendSubtitleText(rawText, clearInput = true) {
         const input = document.getElementById("subtitleInput");
-        const text = input.value.trim();
-        if (!text) return;
-        if (!ws || ws.readyState !== WebSocket.OPEN) { appendMsg("系统", "未连接到课堂", "text-danger"); return; }
+        const text = String(rawText || "").trim();
+        if (!text) return false;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            appendMsg("系统", "未连接到课堂", "text-danger");
+            return false;
+        }
         ws.send(JSON.stringify({ type: "subtitle", content: text }));
-        input.value = "";
+        if (clearInput) input.value = "";
+        return true;
+    }
+
+    function setupSpeechRecognition() {
+        const startBtn = document.getElementById("btnStartSpeechRecognition");
+        const stopBtn = document.getElementById("btnStopSpeechRecognition");
+        const statusEl = document.getElementById("speechRecognitionStatus");
+        if (!window.MediaRecorder) {
+            statusEl.textContent = "当前浏览器不支持录音识别，请手动输入字幕。";
+            startBtn.disabled = true;
+            return;
+        }
+
+        startBtn.addEventListener("click", async () => {
+            try {
+                if (!localStream) {
+                    isMicOn = true;
+                    await toggleMedia();
+                } else if (localStream.getAudioTracks()[0]) {
+                    isMicOn = true;
+                    localStream.getAudioTracks()[0].enabled = true;
+                    updateMediaUI();
+                }
+                const audioTracks = localStream ? localStream.getAudioTracks() : [];
+                if (!audioTracks.length) {
+                    throw new Error("未检测到可用麦克风");
+                }
+                speechChunks = [];
+                const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+                    ? "audio/webm"
+                    : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+                speechRecorder = mimeType
+                    ? new MediaRecorder(new MediaStream(audioTracks), { mimeType })
+                    : new MediaRecorder(new MediaStream(audioTracks));
+                speechRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) speechChunks.push(event.data);
+                };
+                speechRecorder.onerror = () => {
+                    statusEl.textContent = "录音失败，请检查麦克风权限。";
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                };
+                speechRecorder.onstop = async () => {
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    const recordedType = speechRecorder.mimeType || (speechChunks[0] && speechChunks[0].type) || "audio/webm";
+                    const audioBlob = new Blob(speechChunks, { type: recordedType });
+                    if (!audioBlob.size) {
+                        statusEl.textContent = "未录到有效语音，请重试。";
+                        return;
+                    }
+                    statusEl.textContent = "正在用 Whisper 识别...";
+                    try {
+                        const normalized = await uploadRecordedSpeech(audioBlob);
+                        const input = document.getElementById("subtitleInput");
+                        input.value = normalized;
+                        if (document.getElementById("autoSendRecognizedSubtitle").checked) {
+                            const sent = sendSubtitleText(normalized, true);
+                            statusEl.textContent = sent ? "识别完成，已自动发送字幕。" : "识别完成，但当前未连接课堂。";
+                        } else {
+                            statusEl.textContent = "识别完成，结果已回填到字幕框。";
+                        }
+                    } catch (err) {
+                        statusEl.textContent = err.message;
+                    }
+                };
+                speechRecorder.start();
+                statusEl.textContent = "录音中，请点击“停止识别”结束。";
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (err) {
+                statusEl.textContent = "无法启动录音识别：" + err.message;
+            }
+        });
+
+        stopBtn.addEventListener("click", () => {
+            if (speechRecorder && speechRecorder.state !== "inactive") {
+                speechRecorder.stop();
+            }
+        });
+    }
+
+    document.getElementById("btnSendSubtitle").addEventListener("click", () => {
+        sendSubtitleText(document.getElementById("subtitleInput").value, true);
     });
     document.getElementById("subtitleInput").addEventListener("keydown", (e) => {
         if (e.key === "Enter") document.getElementById("btnSendSubtitle").click();
@@ -345,10 +482,12 @@
     async function toggleMedia() {
         if (!localStream) {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const constraints = { video: isCamOn, audio: isMicOn };
+                if (!constraints.video && !constraints.audio) return;
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 document.getElementById("localVideo").srcObject = localStream;
-                localStream.getVideoTracks()[0].enabled = isCamOn;
-                localStream.getAudioTracks()[0].enabled = isMicOn;
+                if (localStream.getVideoTracks()[0]) localStream.getVideoTracks()[0].enabled = isCamOn;
+                if (localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = isMicOn;
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: "webrtc_ready" }));
                 }
@@ -368,8 +507,14 @@
                 return;
             }
         } else {
-            localStream.getVideoTracks()[0].enabled = isCamOn;
-            localStream.getAudioTracks()[0].enabled = isMicOn;
+            const needNewTrack = (isCamOn && !localStream.getVideoTracks()[0]) || (isMicOn && !localStream.getAudioTracks()[0]);
+            if (needNewTrack) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+                return toggleMedia();
+            }
+            if (localStream.getVideoTracks()[0]) localStream.getVideoTracks()[0].enabled = isCamOn;
+            if (localStream.getAudioTracks()[0]) localStream.getAudioTracks()[0].enabled = isMicOn;
         }
         updateMediaUI();
     }
@@ -410,5 +555,6 @@
     });
 
     connectWS();
+    setupSpeechRecognition();
 </script>
 {% endblock %}
