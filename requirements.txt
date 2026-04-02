@@ -8,3 +8,5 @@ PyMuPDF
 mlx-whisper
 imageio-ffmpeg
 transformers
+python-docx
+pywin32; platform_system == "Windows"

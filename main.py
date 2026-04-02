@@ -1,21 +1,24 @@
 import os
+import asyncio
 import json
 import uuid
 import hashlib
 import re
+import shutil
+import subprocess
 
 from fastapi import (
     FastAPI, Request, Form, UploadFile, File, Query,
     WebSocket, WebSocketDisconnect,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from database import (
     init_db, create_user, get_user_by_username, get_user_by_id,
-    save_courseware, get_courseware_by_id,
+    save_courseware, get_courseware_by_id, delete_courseware,
     get_courseware_by_classroom, get_courseware_orphan_by_teacher,
     create_classroom, get_classroom_by_code, get_active_classroom_by_teacher,
     get_classrooms_by_teacher, get_classroom_by_id_and_teacher, end_classroom_for_teacher,
@@ -301,6 +304,108 @@ def _safe_redirect_path(redirect_to: str, default: str = "/teacher") -> str:
     return redirect_to
 
 
+def _preview_pdf_path(file_path: str) -> str:
+    root, _ = os.path.splitext(file_path)
+    return f"{root}.preview.pdf"
+
+
+def _convert_office_to_pdf(file_path: str) -> tuple[bool, str]:
+    """
+    将 doc/docx/pptx 转为 pdf 预览文件。
+    需要系统可用的 LibreOffice/soffice。
+    """
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        # Windows 兜底：尝试使用本机 Office COM 导出 PDF
+        return _convert_office_to_pdf_windows(file_path)
+
+    in_dir = os.path.dirname(file_path)
+    base = os.path.splitext(os.path.basename(file_path))[0]
+    generated_pdf = os.path.join(in_dir, f"{base}.pdf")
+    preview_pdf = _preview_pdf_path(file_path)
+
+    try:
+        if os.path.exists(generated_pdf):
+            os.remove(generated_pdf)
+        cmd = [soffice, "--headless", "--convert-to", "pdf", "--outdir", in_dir, file_path]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
+        if proc.returncode != 0 or not os.path.exists(generated_pdf):
+            err = (proc.stderr or proc.stdout or "").strip() or "未知错误"
+            return False, err
+        if os.path.abspath(generated_pdf) != os.path.abspath(preview_pdf):
+            if os.path.exists(preview_pdf):
+                os.remove(preview_pdf)
+            os.replace(generated_pdf, preview_pdf)
+        return True, preview_pdf
+    except Exception as e:
+        return False, str(e)
+
+
+def _convert_office_to_pdf_windows(file_path: str) -> tuple[bool, str]:
+    """Windows 下使用本机 Office（Word/PPT）导出 PDF。"""
+    if os.name != "nt":
+        return False, "未检测到 LibreOffice/soffice，且当前系统不支持 Office COM 转换"
+
+    ext = os.path.splitext(file_path)[1].lower()
+    preview_pdf = _preview_pdf_path(file_path)
+    abs_src = os.path.abspath(file_path)
+    abs_pdf = os.path.abspath(preview_pdf)
+    try:
+        import win32com.client  # type: ignore
+    except Exception:
+        return False, "未安装 pywin32，且未检测到 LibreOffice/soffice，无法进行版式预览转换"
+
+    try:
+        if os.path.exists(abs_pdf):
+            os.remove(abs_pdf)
+
+        if ext in (".doc", ".docx"):
+            word = win32com.client.DispatchEx("Word.Application")
+            word.Visible = False
+            doc = None
+            try:
+                doc = word.Documents.Open(abs_src, ReadOnly=True)
+                # 17 = wdExportFormatPDF
+                doc.ExportAsFixedFormat(abs_pdf, 17)
+            finally:
+                if doc is not None:
+                    doc.Close(False)
+                word.Quit()
+        elif ext == ".pptx":
+            ppt = win32com.client.DispatchEx("PowerPoint.Application")
+            # 1 = msoTrue
+            ppt.Visible = 1
+            pres = None
+            try:
+                # WithWindow=False
+                pres = ppt.Presentations.Open(abs_src, WithWindow=False)
+                # 32 = ppSaveAsPDF
+                pres.SaveAs(abs_pdf, 32)
+            finally:
+                if pres is not None:
+                    pres.Close()
+                ppt.Quit()
+        else:
+            return False, "仅支持 doc/docx/pptx 的 Office COM 转换"
+
+        if not os.path.exists(abs_pdf):
+            return False, "Office 已执行转换但未生成 PDF 文件"
+        return True, abs_pdf
+    except Exception as e:
+        return False, f"Office COM 转换失败: {e}"
+
+
+def _courseware_ext(cw) -> str:
+    ext = (cw["file_ext"] or "").strip().lower()
+    if ext:
+        return ext
+    return os.path.splitext(cw["filename"] or "")[1].lower()
+
+
+def _courseware_file_path(cw) -> str:
+    return os.path.join(UPLOAD_DIR, cw["filename"])
+
+
 @app.post("/upload-courseware")
 async def upload_courseware(
     request: Request,
@@ -322,8 +427,56 @@ async def upload_courseware(
     with open(path, "wb") as f:
         f.write(await file.read())
 
-    text_content = _extract_text(path, ext)
+    # 文本提取放到线程并设置超时，避免个别文件解析卡住导致上传一直不返回
+    try:
+        text_content = await asyncio.wait_for(
+            asyncio.to_thread(_extract_text, path, ext),
+            timeout=12.0,
+        )
+    except asyncio.TimeoutError:
+        text_content = "[课件文本提取超时，请稍后重试或更换文件]"
+
+    # 对可转换格式预生成 PDF 预览（分页 + 尽量保留原布局）
+    ext_lower = (ext or "").lower()
+    if ext_lower in (".pptx", ".doc", ".docx"):
+        try:
+            await asyncio.wait_for(asyncio.to_thread(_convert_office_to_pdf, path), timeout=40.0)
+        except Exception:
+            # 预览转换失败时不影响上传主流程，前端会回退到文本展示
+            pass
+
     save_courseware(user["id"], saved_name, file.filename, text_content, classroom_id, file_ext=ext)
+    dest = _safe_redirect_path(redirect_to, "/teacher")
+    return RedirectResponse(url=dest, status_code=303)
+
+
+@app.post("/delete-courseware")
+async def delete_courseware_route(
+    request: Request,
+    cw_id: int = Form(...),
+    redirect_to: str = Form("/teacher"),
+):
+    user = _current_user(request)
+    if not user or user["role"] != "teacher":
+        return RedirectResponse(url="/login")
+
+    cw = get_courseware_by_id(cw_id)
+    if not cw or cw["teacher_id"] != user["id"]:
+        return RedirectResponse(url="/teacher", status_code=303)
+
+    delete_courseware(cw_id)
+
+    # 可选：删除本地文件
+    try:
+        path = _courseware_file_path(cw)
+        if os.path.exists(path):
+            os.remove(path)
+        preview_pdf = _preview_pdf_path(path)
+        if os.path.exists(preview_pdf):
+            os.remove(preview_pdf)
+    except Exception:
+        pass
+
     dest = _safe_redirect_path(redirect_to, "/teacher")
     return RedirectResponse(url=dest, status_code=303)
 
@@ -567,6 +720,99 @@ async def api_recognize_sign(
         if saved_path and os.path.exists(saved_path):
             os.remove(saved_path)
 
+
+@app.get("/api/courseware/{cw_id}/display")
+async def api_courseware_display(
+    cw_id: int,
+    request: Request,
+    classroom_id: int = Query(..., description="加入课堂时返回的 classroom_id，用于校验课件归属"),
+):
+    user = _current_user(request)
+    if not user:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    cw = get_courseware_by_id(cw_id)
+    if not cw or cw["classroom_id"] is None or int(cw["classroom_id"]) != int(classroom_id):
+        return JSONResponse({"error": "课件不存在或无权访问"}, status_code=404)
+
+    ext = _courseware_ext(cw)
+    file_path = _courseware_file_path(cw)
+    preview_pdf = _preview_pdf_path(file_path)
+    file_url_base = f"/api/courseware/{cw_id}/file?classroom_id={classroom_id}"
+
+    # PDF：浏览器内直接分页展示，版式最接近原文件
+    if ext == ".pdf":
+        return JSONResponse({
+            "mode": "pdf",
+            "name": cw["original_name"],
+            "file_url": f"{file_url_base}&variant=original",
+        })
+
+    # PPT/Word：优先使用预生成（或即时生成）的 PDF 预览
+    if ext in (".pptx", ".doc", ".docx"):
+        if not os.path.exists(preview_pdf):
+            ok, _ = await asyncio.to_thread(_convert_office_to_pdf, file_path)
+            if not ok:
+                # 转换失败就回退文本展示，不阻塞课堂
+                return JSONResponse({
+                    "mode": "text",
+                    "name": cw["original_name"],
+                    "text": cw["text_content"] or "（暂无可展示文本）",
+                })
+        return JSONResponse({
+            "mode": "pdf",
+            "name": cw["original_name"],
+            "file_url": f"{file_url_base}&variant=preview",
+        })
+
+    # 其他格式维持文本展示
+    return JSONResponse({
+        "mode": "text",
+        "name": cw["original_name"],
+        "text": cw["text_content"] or "（暂无可展示文本）",
+    })
+
+
+@app.get("/api/courseware/{cw_id}/file")
+async def api_courseware_file(
+    cw_id: int,
+    request: Request,
+    classroom_id: int = Query(..., description="加入课堂时返回的 classroom_id，用于校验课件归属"),
+    variant: str = Query("auto", description="auto | original | preview"),
+):
+    user = _current_user(request)
+    if not user:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    cw = get_courseware_by_id(cw_id)
+    if not cw or cw["classroom_id"] is None or int(cw["classroom_id"]) != int(classroom_id):
+        return JSONResponse({"error": "课件不存在或无权访问"}, status_code=404)
+
+    ext = _courseware_ext(cw)
+    original_path = _courseware_file_path(cw)
+    preview_pdf = _preview_pdf_path(original_path)
+    v = (variant or "auto").lower()
+
+    if v == "preview":
+        if not os.path.exists(preview_pdf):
+            return JSONResponse({"error": "预览文件不存在"}, status_code=404)
+        return FileResponse(preview_pdf, media_type="application/pdf", filename=f"{cw['original_name']}.pdf", content_disposition_type="inline")
+
+    if v == "original":
+        if not os.path.exists(original_path):
+            return JSONResponse({"error": "原文件不存在"}, status_code=404)
+        media_type = "application/pdf" if ext == ".pdf" else "application/octet-stream"
+        disp = "inline" if ext == ".pdf" else "attachment"
+        return FileResponse(original_path, media_type=media_type, filename=cw["original_name"], content_disposition_type=disp)
+
+    # auto
+    if ext == ".pdf" and os.path.exists(original_path):
+        return FileResponse(original_path, media_type="application/pdf", filename=cw["original_name"], content_disposition_type="inline")
+    if os.path.exists(preview_pdf):
+        return FileResponse(preview_pdf, media_type="application/pdf", filename=f"{cw['original_name']}.pdf", content_disposition_type="inline")
+    if os.path.exists(original_path):
+        media_type = "application/octet-stream"
+        return FileResponse(original_path, media_type=media_type, filename=cw["original_name"], content_disposition_type="attachment")
+    return JSONResponse({"error": "文件不存在"}, status_code=404)
+
 # ---------------------------------------------------------------------------
 # WebSocket 实时课堂
 # ---------------------------------------------------------------------------
@@ -587,6 +833,12 @@ async def ws_classroom(websocket: WebSocket, room_code: str):
 
     user_info = {"id": user["id"], "username": user["username"], "role": user["role"]}
     await manager.connect(websocket, room_key, user_info)
+    # 先把房间当前成员发给新连接者，避免先后进入顺序导致老师/学生端一直显示“等待”
+    members = [conn["user"] for conn in manager.rooms.get(room_key, [])]
+    await websocket.send_text(json.dumps({
+        "type": "presence_snapshot",
+        "members": members,
+    }, ensure_ascii=False))
     await manager.broadcast(room_key, {
         "type": "system",
         "content": f"{user['username']}（{ROLE_LABELS.get(user['role'], '')}）加入了课堂",

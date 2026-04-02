@@ -270,6 +270,13 @@ def get_courseware_by_id(cw_id):
     return row
 
 
+def delete_courseware(cw_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM courseware WHERE id = ?", (cw_id,))
+    conn.commit()
+    conn.close()
+
+
 def create_classroom(teacher_id, room_code, name):
     conn = get_db()
     conn.execute(
