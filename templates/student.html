@@ -4,20 +4,24 @@
 {% block title %}学习端 - 无障碍教学平台{% endblock %}
 
 {% block content %}
-<h2 class="mb-2"><i class="bi bi-book-half text-primary"></i> 学习端</h2>
-<p class="text-muted mb-4">您可在同一页面按需使用实时文字、评论互动与课件朗读等功能，无需在注册时做类别选择。</p>
+<div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-book-half text-primary"></i>
+    <span class="fw-semibold">学习端</span>
+</div>
 
-<div class="row g-4 mb-3">
+<div class="row g-3 mb-2">
     <div class="col-12">
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white"><i class="bi bi-door-open"></i> 加入课堂</div>
-            <div class="card-body">
-                <div class="row align-items-end g-3">
+            <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-door-open"></i> 加入课堂</span>
+                <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" id="btnToggleJoinPanel">收起</button>
+            </div>
+            <div class="card-body py-2" id="joinPanelBody">
+                <div class="row align-items-center g-2">
                     <div class="col-md-6 col-lg-4">
-                        <label class="form-label mb-1">房间号</label>
                         <div class="input-group">
-                            <input type="text" id="roomCodeInput" class="form-control text-uppercase" placeholder="例如 AD0081" maxlength="12" autocomplete="off">
-                            <button type="button" class="btn btn-primary" id="btnJoin">加入</button>
+                            <input type="text" id="roomCodeInput" class="form-control form-control-sm text-uppercase" placeholder="例如 AD0081" maxlength="12" autocomplete="off">
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btnJoin">加入</button>
                         </div>
                     </div>
                     <div class="col-md-6 col-lg-8 d-flex flex-wrap align-items-center gap-2" id="joinStatusArea" style="display: none;">
@@ -32,7 +36,7 @@
     </div>
 </div>
 
-<div class="row g-3 mt-1" id="classroomWorkspace" style="display: none;">
+<div class="row g-3 mt-0" id="classroomWorkspace" style="display: none;">
     <!-- 左侧主屏幕区 (占 9 列) -->
     <div class="col-lg-9 d-flex flex-column gap-3">
         
@@ -41,12 +45,14 @@
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-easel"></i> 课堂主屏幕</span>
                 <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="btnReadTeacherSpeech" type="button"><i class="bi bi-volume-up"></i> 朗读老师发言</button>
+                    <button class="btn btn-sm btn-outline-light" id="btnFullscreenMain" type="button"><i class="bi bi-arrows-fullscreen"></i> 全屏</button>
                     <button class="btn btn-sm btn-outline-light" id="btnToggleMic"><i class="bi bi-mic-mute"></i> 打开麦克风</button>
                     <button class="btn btn-sm btn-outline-light" id="btnToggleCam"><i class="bi bi-camera-video-off"></i> 打开摄像头</button>
                 </div>
             </div>
             <!-- 主屏幕内容：展示课件 -->
-            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; overflow: hidden;">
+            <div class="card-body p-0 bg-secondary position-relative" id="mainScreenPanel" style="min-height: 450px; overflow: hidden;">
                 <div id="mainCoursewareArea" class="w-100 h-100 d-flex align-items-center justify-content-center">
                     <div class="text-center text-white-50">
                         <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
@@ -106,20 +112,38 @@
                 </div>
             </div>
             <div class="col-md-5">
-                <div class="card shadow-sm h-100">
+                <div class="card shadow-sm h-100 d-flex flex-column">
                     <div class="card-header bg-dark text-white"><i class="bi bi-file-earmark-text"></i> 课件文字朗读</div>
-                    <div class="card-body" style="overflow-y: auto; max-height: 250px;">
+                    <div class="card-body d-flex flex-column flex-grow-1" style="min-height: 0;">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="voiceControlEnabled">
+                            <label class="form-check-label small" for="voiceControlEnabled">开启语音控制网页</label>
+                        </div>
+                        <div class="small text-muted mb-2" id="voiceControlStatus">语音控制已关闭。可说“加入课堂”“打开摄像头”“朗读当前页”等命令。</div>
                         <ul class="list-group list-group-flush mb-2" id="coursewareList">
                             <li class="list-group-item text-muted text-center border-0 py-1">等待加载...</li>
                         </ul>
-                        <div class="border rounded p-2 bg-light small mb-2" style="max-height:100px;overflow-y:auto" id="previewText" aria-live="polite">
-                            <span class="text-muted">点击课件可预览文字；支持时将以语音朗读。</span>
+                        <div class="border rounded p-2 bg-light small mb-3 d-flex flex-column flex-grow-1" id="previewText" aria-live="polite">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPrevPreviewPage">上一页</button>
+                                <span class="text-muted text-center flex-grow-1" id="previewPageIndicator">未选择课件</span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnNextPreviewPage">下一页</button>
+                            </div>
+                            <div class="border rounded bg-white p-3 flex-grow-1" id="previewPageContent" style="min-height:220px; max-height:none; overflow-y:auto; white-space:pre-wrap; line-height:1.7;">
+                                <span class="text-muted">点击课件可预览文字；支持时将按页朗读。</span>
+                            </div>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="autoReadCurrentPage">
+                            <label class="form-check-label small" for="autoReadCurrentPage">自动朗读当前PPT页内容</label>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="autoSpeakSubtitles">
                             <label class="form-check-label small" for="autoSpeakSubtitles">自动朗读老师发送的课堂字幕</label>
                         </div>
-                        <button type="button" class="btn btn-outline-danger btn-sm" id="btnStopSpeech">停止朗读</button>
+                    </div>
+                    <div class="card-footer bg-white mt-auto">
+                        <button type="button" class="btn btn-outline-danger w-100" id="btnStopSpeech">停止朗读</button>
                     </div>
                 </div>
             </div>
@@ -175,6 +199,17 @@
     let isMicOn = false;
     let signRecorder = null;
     let signChunks = [];
+    let currentCoursewareText = "";
+    let currentCoursewareName = "";
+    let currentCoursewarePages = [];
+    let currentCoursewareItems = [];
+    let currentCoursewareIndex = -1;
+    let currentPreviewPageIndex = 0;
+    let voiceControlEnabled = false;
+    let voiceRecognizer = null;
+    let voiceRecognizerStarting = false;
+    let pauseVoiceControlForSpeech = false;
+    let joinPanelCollapsed = false;
 
     // WebRTC 状态
     let peerConnection = null;
@@ -203,6 +238,39 @@
 
     function updateTeacherSpeechDisplay(text) {
         document.getElementById("teacherSpeechText").textContent = text || "等待老师发送字幕...";
+    }
+
+    function updateVoiceControlStatus(text) {
+        document.getElementById("voiceControlStatus").textContent = text;
+    }
+
+    function setJoinPanelCollapsed(collapsed) {
+        joinPanelCollapsed = Boolean(collapsed);
+        const body = document.getElementById("joinPanelBody");
+        const btn = document.getElementById("btnToggleJoinPanel");
+        body.style.display = joinPanelCollapsed ? "none" : "";
+        btn.textContent = joinPanelCollapsed ? "展开" : "收起";
+    }
+
+    function speakTeacherSpeech() {
+        const text = (document.getElementById("teacherSpeechText").textContent || "").trim();
+        if (!text || text === "等待老师发送字幕...") {
+            updateVoiceControlStatus("当前没有可朗读的老师发言。");
+            return false;
+        }
+        speak(text);
+        updateVoiceControlStatus("正在朗读老师当前发言。");
+        return true;
+    }
+
+    async function toggleMainScreenFullscreen() {
+        const panel = document.getElementById("mainScreenPanel");
+        if (!document.fullscreenElement) {
+            await panel.requestFullscreen();
+            return true;
+        }
+        await document.exitFullscreen();
+        return true;
     }
 
     function syncPhraseModeHint() {
@@ -343,19 +411,426 @@
 
     function speak(text) {
         if (!text || !("speechSynthesis" in window)) return;
+        if (voiceControlEnabled && voiceRecognizer && !pauseVoiceControlForSpeech) {
+            pauseVoiceControlForSpeech = true;
+            try { voiceRecognizer.stop(); } catch (e) {}
+        }
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = "zh-CN";
+        u.onend = () => {
+            if (voiceControlEnabled && pauseVoiceControlForSpeech) {
+                pauseVoiceControlForSpeech = false;
+                startVoiceControlListening();
+            }
+        };
         window.speechSynthesis.speak(u);
+    }
+
+    function speakCurrentPage() {
+        const text = (currentCoursewareText || "").trim();
+        if (!text) {
+            updateVoiceControlStatus("当前没有可朗读的PPT页内容。");
+            return false;
+        }
+        speak(text);
+        updateVoiceControlStatus("正在朗读当前PPT页内容。");
+        return true;
+    }
+
+    function updateCurrentCoursewareText(name, text) {
+        currentCoursewareName = name || "";
+        currentCoursewareText = text || "";
+        if (document.getElementById("autoReadCurrentPage").checked && currentCoursewareText.trim()) {
+            speakCurrentPage();
+        }
+    }
+
+    function renderPreviewPage() {
+        const content = document.getElementById("previewPageContent");
+        const indicator = document.getElementById("previewPageIndicator");
+        const prevBtn = document.getElementById("btnPrevPreviewPage");
+        const nextBtn = document.getElementById("btnNextPreviewPage");
+        if (!currentCoursewarePages.length) {
+            indicator.textContent = "未选择课件";
+            content.innerHTML = '<span class="text-muted">点击课件可预览文字；支持时将按页朗读。</span>';
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            updateCurrentCoursewareText("", "");
+            return;
+        }
+        currentPreviewPageIndex = Math.max(0, Math.min(currentPreviewPageIndex, currentCoursewarePages.length - 1));
+        const pageText = currentCoursewarePages[currentPreviewPageIndex] || "（本页暂无可提取文本）";
+        indicator.textContent = `${currentCoursewareName || "当前课件"} · 第 ${currentPreviewPageIndex + 1} / ${currentCoursewarePages.length} 页`;
+        content.textContent = pageText;
+        prevBtn.disabled = currentPreviewPageIndex <= 0;
+        nextBtn.disabled = currentPreviewPageIndex >= currentCoursewarePages.length - 1;
+        updateCurrentCoursewareText(currentCoursewareName, pageText);
+    }
+
+    function setPreviewPages(name, pages) {
+        currentCoursewareName = name || "";
+        currentCoursewarePages = Array.isArray(pages) && pages.length ? pages : ["（暂无可提取文本）"];
+        currentPreviewPageIndex = 0;
+        renderPreviewPage();
+    }
+
+    function setCurrentCoursewareIndexById(cwId) {
+        currentCoursewareIndex = currentCoursewareItems.findIndex((item) => Number(item.id) === Number(cwId));
+    }
+
+    async function previewCourseware(cw) {
+        if (!cw) return false;
+        if (joinedClassroomId == null) {
+            setPreviewPages("", ["请先加入课堂"]);
+            return false;
+        }
+        const res = await fetch(
+            "/api/courseware/" + cw.id + "/text?classroom_id=" + encodeURIComponent(joinedClassroomId),
+            { credentials: "same-origin" }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            setPreviewPages("", [data.error || "加载失败"]);
+            return false;
+        }
+        const pages = Array.isArray(data.pages) && data.pages.length ? data.pages : [data.text || "（暂无提取文本）"];
+        setPreviewPages(data.name || cw.name || "", pages);
+        setCurrentCoursewareIndexById(cw.id);
+        speakCurrentPage();
+        return true;
+    }
+
+    async function showCoursewareOnMainScreen(cw) {
+        if (!cw) return false;
+        if (joinedClassroomId == null) {
+            appendLine("系统", "请先加入课堂", "text-danger");
+            return false;
+        }
+        const res = await fetch(
+            "/api/courseware/" + cw.id + "/display?classroom_id=" + encodeURIComponent(joinedClassroomId),
+            { credentials: "same-origin" }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            appendLine("系统", data.error || "课件展示失败", "text-danger");
+            return false;
+        }
+        renderMainCourseware(data);
+        setCurrentCoursewareIndexById(cw.id);
+        appendLine("系统", "已在主屏幕展示课件：" + (data.name || cw.name || "课件"), "text-info");
+        return true;
+    }
+
+    async function showCoursewareByIndex(index) {
+        if (!currentCoursewareItems.length) {
+            updateVoiceControlStatus("当前没有可展示的课件。");
+            return false;
+        }
+        const boundedIndex = Math.max(0, Math.min(index, currentCoursewareItems.length - 1));
+        const ok = await showCoursewareOnMainScreen(currentCoursewareItems[boundedIndex]);
+        if (ok) {
+            updateVoiceControlStatus("已展示课件：" + currentCoursewareItems[boundedIndex].name);
+        }
+        return ok;
+    }
+
+    function normalizeVoiceCommand(text) {
+        return String(text || "").replace(/[，。！？、,.!?]/g, "").replace(/\s+/g, "").trim();
+    }
+
+    function extractVoiceCommentContent(rawText) {
+        const source = String(rawText || "").trim();
+        if (!source) return "";
+        const prefixMatch = source.match(/^(发送评论|发送消息)\s*[:：]?\s*(.*)$/);
+        if (!prefixMatch) return "";
+        return String(prefixMatch[2] || "").trim();
+    }
+
+    async function handleVoiceCommand(rawText) {
+        const text = normalizeVoiceCommand(rawText);
+        if (!text) return;
+        updateVoiceControlStatus(`识别到指令：${text}`);
+
+        if (text.includes("加入课堂")) {
+            const roomMatch = text.match(/加入课堂(?:房间号)?([A-Z0-9]{4,12})$/);
+            if (roomMatch && roomMatch[1]) {
+                document.getElementById("roomCodeInput").value = roomMatch[1];
+            }
+            document.getElementById("btnJoin").click();
+            return;
+        }
+        if (text.includes("退出课堂") || text.includes("离开课堂")) {
+            document.getElementById("btnLeaveClassroom").click();
+            return;
+        }
+        if (text.includes("打开摄像头")) {
+            if (!isCamOn) document.getElementById("btnToggleCam").click();
+            return;
+        }
+        if (text.includes("关闭摄像头")) {
+            if (isCamOn) document.getElementById("btnToggleCam").click();
+            return;
+        }
+        if (text.includes("打开麦克风")) {
+            if (!isMicOn) document.getElementById("btnToggleMic").click();
+            return;
+        }
+        if (text.includes("关闭麦克风")) {
+            if (isMicOn) document.getElementById("btnToggleMic").click();
+            return;
+        }
+        if (text.includes("朗读当前页") || text.includes("朗读当前页内容") || text.includes("朗读课件")) {
+            speakCurrentPage();
+            return;
+        }
+        if (text.includes("朗读老师发言") || text.includes("重复老师发言") || text.includes("朗读老师当前发言")) {
+            speakTeacherSpeech();
+            return;
+        }
+        if (text.includes("下一页")) {
+            if (currentCoursewarePages.length > 1 && currentPreviewPageIndex < currentCoursewarePages.length - 1) {
+                currentPreviewPageIndex += 1;
+                renderPreviewPage();
+                updateVoiceControlStatus("已切换到下一页。");
+            }
+            return;
+        }
+        if (text.includes("上一页")) {
+            if (currentCoursewarePages.length > 1 && currentPreviewPageIndex > 0) {
+                currentPreviewPageIndex -= 1;
+                renderPreviewPage();
+                updateVoiceControlStatus("已切换到上一页。");
+            }
+            return;
+        }
+        if (text.includes("展示课件")) {
+            const nthMatch = text.match(/第([一二三四五六七八九十\d]+)个/);
+            if (nthMatch) {
+                const zhMap = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "七":7, "八":8, "九":9, "十":10 };
+                const raw = nthMatch[1];
+                const index = /^\d+$/.test(raw) ? Number(raw) - 1 : ((zhMap[raw] || 1) - 1);
+                await showCoursewareByIndex(index);
+            } else if (currentCoursewareIndex >= 0) {
+                await showCoursewareByIndex(currentCoursewareIndex);
+            } else {
+                await showCoursewareByIndex(0);
+            }
+            return;
+        }
+        if (text.includes("下一个课件")) {
+            await showCoursewareByIndex(currentCoursewareIndex >= 0 ? currentCoursewareIndex + 1 : 0);
+            return;
+        }
+        if (text.includes("上一个课件")) {
+            await showCoursewareByIndex(currentCoursewareIndex >= 0 ? currentCoursewareIndex - 1 : 0);
+            return;
+        }
+        if (text.includes("全屏") || text.includes("全屏显示")) {
+            await toggleMainScreenFullscreen();
+            updateVoiceControlStatus(document.fullscreenElement ? "已进入全屏主屏幕。" : "已退出全屏主屏幕。");
+            return;
+        }
+        if (text.includes("收起加入课堂")) {
+            setJoinPanelCollapsed(true);
+            updateVoiceControlStatus("已收起加入课堂区域。");
+            return;
+        }
+        if (text.includes("展开加入课堂")) {
+            setJoinPanelCollapsed(false);
+            updateVoiceControlStatus("已展开加入课堂区域。");
+            return;
+        }
+        if (text.includes("停止朗读")) {
+            document.getElementById("btnStopSpeech").click();
+            return;
+        }
+        if (text.includes("识别手语")) {
+            document.getElementById("btnRecognizeSign").click();
+            return;
+        }
+        if (text.includes("清空手势码")) {
+            document.getElementById("btnClearSignBuffer").click();
+            return;
+        }
+        if (text.includes("发送评论") || text.includes("发送消息")) {
+            const commentText = extractVoiceCommentContent(rawText);
+            if (commentText) {
+                document.getElementById("commentInput").value = commentText;
+            } else {
+                updateVoiceControlStatus("请在“发送评论”后面直接说出评论内容。");
+                return;
+            }
+            sendComment();
+            return;
+        }
+        if (text.includes("开启固定短句模式")) {
+            document.getElementById("fixedPhraseMode").checked = true;
+            updateVoiceControlStatus("已开启固定短句模式。");
+            return;
+        }
+        if (text.includes("关闭固定短句模式")) {
+            document.getElementById("fixedPhraseMode").checked = false;
+            updateVoiceControlStatus("已关闭固定短句模式。");
+            return;
+        }
+        if (text.includes("开启自动发送")) {
+            document.getElementById("autoSendRecognizedComment").checked = true;
+            updateVoiceControlStatus("已开启手语识别后自动发送。");
+            return;
+        }
+        if (text.includes("关闭自动发送")) {
+            document.getElementById("autoSendRecognizedComment").checked = false;
+            updateVoiceControlStatus("已关闭手语识别后自动发送。");
+            return;
+        }
+        if (text.includes("开启朗读当前页")) {
+            document.getElementById("autoReadCurrentPage").checked = true;
+            speakCurrentPage();
+            return;
+        }
+        if (text.includes("关闭朗读当前页")) {
+            document.getElementById("autoReadCurrentPage").checked = false;
+            updateVoiceControlStatus("已关闭自动朗读当前页。");
+            return;
+        }
+        if (text.includes("开启字幕朗读")) {
+            document.getElementById("autoSpeakSubtitles").checked = true;
+            autoSpeakSubtitles = true;
+            updateVoiceControlStatus("已开启字幕自动朗读。");
+            return;
+        }
+        if (text.includes("关闭字幕朗读")) {
+            document.getElementById("autoSpeakSubtitles").checked = false;
+            autoSpeakSubtitles = false;
+            updateVoiceControlStatus("已关闭字幕自动朗读。");
+            return;
+        }
+        if (text.includes("打开语音控制")) {
+            document.getElementById("voiceControlEnabled").checked = true;
+            startVoiceControlListening();
+            return;
+        }
+        if (text.includes("关闭语音控制")) {
+            document.getElementById("voiceControlEnabled").checked = false;
+            stopVoiceControlListening();
+            return;
+        }
+        updateVoiceControlStatus(`未匹配到可执行命令：${text}`);
+    }
+
+    function createVoiceRecognizer() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return null;
+        const recognizer = new SpeechRecognition();
+        recognizer.lang = "zh-CN";
+        recognizer.continuous = true;
+        recognizer.interimResults = false;
+        recognizer.onresult = async (event) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    const transcript = (event.results[i][0] && event.results[i][0].transcript) || "";
+                    await handleVoiceCommand(transcript);
+                }
+            }
+        };
+        recognizer.onstart = () => {
+            voiceRecognizerStarting = false;
+            if (voiceControlEnabled) updateVoiceControlStatus("语音控制已开启，正在持续监听命令。");
+        };
+        recognizer.onerror = (event) => {
+            voiceRecognizerStarting = false;
+            if (voiceControlEnabled) {
+                updateVoiceControlStatus("语音控制识别异常：" + (event.error || "未知错误"));
+            }
+        };
+        recognizer.onend = () => {
+            voiceRecognizerStarting = false;
+            if (voiceControlEnabled && !pauseVoiceControlForSpeech) {
+                startVoiceControlListening();
+            }
+        };
+        return recognizer;
+    }
+
+    function startVoiceControlListening() {
+        if (!voiceControlEnabled) return;
+        if (!voiceRecognizer) {
+            voiceRecognizer = createVoiceRecognizer();
+        }
+        if (!voiceRecognizer) {
+            updateVoiceControlStatus("当前浏览器不支持语音控制。");
+            document.getElementById("voiceControlEnabled").checked = false;
+            voiceControlEnabled = false;
+            return;
+        }
+        if (voiceRecognizerStarting) return;
+        voiceRecognizerStarting = true;
+        try {
+            voiceRecognizer.start();
+        } catch (e) {
+            voiceRecognizerStarting = false;
+            updateVoiceControlStatus("无法启动语音控制：" + e.message);
+        }
+    }
+
+    function stopVoiceControlListening() {
+        voiceControlEnabled = false;
+        pauseVoiceControlForSpeech = false;
+        voiceRecognizerStarting = false;
+        if (voiceRecognizer) {
+            try { voiceRecognizer.stop(); } catch (e) {}
+        }
+        updateVoiceControlStatus("语音控制已关闭。可说“加入课堂”“打开摄像头”“朗读当前页”等命令。");
     }
 
     document.getElementById("autoSpeakSubtitles").addEventListener("change", (e) => {
         autoSpeakSubtitles = e.target.checked;
     });
+    document.getElementById("autoReadCurrentPage").addEventListener("change", (e) => {
+        if (e.target.checked && currentCoursewareText.trim()) {
+            speakCurrentPage();
+        }
+    });
+    document.getElementById("voiceControlEnabled").addEventListener("change", (e) => {
+        voiceControlEnabled = e.target.checked;
+        if (voiceControlEnabled) {
+            startVoiceControlListening();
+        } else {
+            stopVoiceControlListening();
+        }
+    });
+    document.getElementById("btnToggleJoinPanel").addEventListener("click", () => {
+        setJoinPanelCollapsed(!joinPanelCollapsed);
+    });
+    document.getElementById("btnReadTeacherSpeech").addEventListener("click", () => {
+        speakTeacherSpeech();
+    });
+    document.getElementById("btnFullscreenMain").addEventListener("click", async () => {
+        try {
+            await toggleMainScreenFullscreen();
+        } catch (e) {
+            updateVoiceControlStatus("无法切换全屏：" + e.message);
+        }
+    });
+    document.getElementById("btnPrevPreviewPage").addEventListener("click", () => {
+        if (currentPreviewPageIndex > 0) {
+            currentPreviewPageIndex -= 1;
+            renderPreviewPage();
+        }
+    });
+    document.getElementById("btnNextPreviewPage").addEventListener("click", () => {
+        if (currentPreviewPageIndex < currentCoursewarePages.length - 1) {
+            currentPreviewPageIndex += 1;
+            renderPreviewPage();
+        }
+    });
 
     document.getElementById("btnStopSpeech").addEventListener("click", () => {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     });
+    renderPreviewPage();
+    setJoinPanelCollapsed(false);
 
     function connectWs(roomCode) {
         if (ws) { try { ws.close(); } catch (e) {} }
@@ -386,6 +861,9 @@
                     appendLine("字幕", msg.content, "text-primary");
                     updateTeacherSpeechDisplay(msg.content);
                     if (autoSpeakSubtitles && msg.content) speak(msg.content);
+                    break;
+                case "subtitle_live":
+                    updateTeacherSpeechDisplay(msg.content);
                     break;
                 case "comment":
                     appendLine((msg.username || "同学") + " 评论", msg.content, "text-success");
@@ -599,6 +1077,8 @@
     // --- WebRTC 逻辑结束 ---
 
     async function loadCoursewareList(items) {
+        currentCoursewareItems = Array.isArray(items) ? items : [];
+        currentCoursewareIndex = currentCoursewareItems.length ? 0 : -1;
         const ul = document.getElementById("coursewareList");
         ul.innerHTML = "";
         if (!items || !items.length) {
@@ -611,26 +1091,21 @@
             li.tabIndex = 0;
             li.setAttribute("role", "button");
             li.innerHTML = `
-                <span class="text-truncate" style="max-width: 70%;"><i class="bi bi-file-earmark-text"></i> ${cw.name}</span>
-                <a href="/api/courseware/${cw.id}/file?classroom_id=${encodeURIComponent(joinedClassroomId)}&variant=original" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size: 0.75rem;" title="下载原件" onclick="event.stopPropagation()"><i class="bi bi-download"></i></a>
+                <span class="text-truncate" style="max-width: 52%;"><i class="bi bi-file-earmark-text"></i> ${cw.name}</span>
+                <div class="d-flex gap-1">
+                    <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btnPreviewCourseware" style="font-size: 0.75rem;">预览</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 btnShowCoursewareStudent" style="font-size: 0.75rem;">展示</button>
+                    <a href="/api/courseware/${cw.id}/file?classroom_id=${encodeURIComponent(joinedClassroomId)}&variant=original" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size: 0.75rem;" title="下载原件" onclick="event.stopPropagation()"><i class="bi bi-download"></i></a>
+                </div>
             `;
-            li.addEventListener("click", async () => {
-                if (joinedClassroomId == null) {
-                    document.getElementById("previewText").textContent = "请先加入课堂";
-                    return;
-                }
-                const res = await fetch(
-                    "/api/courseware/" + cw.id + "/text?classroom_id=" + encodeURIComponent(joinedClassroomId),
-                    { credentials: "same-origin" }
-                );
-                const data = await res.json();
-                if (!res.ok) {
-                    document.getElementById("previewText").textContent = data.error || "加载失败";
-                    return;
-                }
-                const t = data.text || "（暂无提取文本）";
-                document.getElementById("previewText").textContent = t;
-                speak(t);
+            li.addEventListener("click", async () => { await previewCourseware(cw); });
+            li.querySelector(".btnPreviewCourseware").addEventListener("click", async (ev) => {
+                ev.stopPropagation();
+                await previewCourseware(cw);
+            });
+            li.querySelector(".btnShowCoursewareStudent").addEventListener("click", async (ev) => {
+                ev.stopPropagation();
+                await showCoursewareOnMainScreen(cw);
             });
             li.addEventListener("keydown", (ev) => {
                 if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); li.click(); }
@@ -663,6 +1138,7 @@
         document.getElementById("classroomWorkspace").style.display = "flex";
         await loadCoursewareList(data.courseware);
         connectWs(data.room_code);
+        setJoinPanelCollapsed(true);
     });
 
     function sendComment() {
@@ -773,8 +1249,21 @@
         document.getElementById("joinStatusArea").style.display = "none";
         document.getElementById("joinStatus").textContent = "";
         document.getElementById("roomCodeInput").value = "";
+        setJoinPanelCollapsed(false);
         document.getElementById("commentInput").disabled = true;
         document.getElementById("btnSendComment").disabled = true;
+        currentCoursewareText = "";
+        currentCoursewareName = "";
+        currentCoursewarePages = [];
+        currentCoursewareItems = [];
+        currentCoursewareIndex = -1;
+        currentPreviewPageIndex = 0;
+        renderPreviewPage();
+        updateTeacherSpeechDisplay("");
+        if (document.getElementById("voiceControlEnabled").checked) {
+            document.getElementById("voiceControlEnabled").checked = false;
+        }
+        stopVoiceControlListening();
         updatePhraseModeStatus("当前手势码缓冲区：空");
         document.getElementById("signRecognitionStatus").textContent = "打开摄像头后可录制短视频片段；当前接入的是固定短句演示模式。";
         document.getElementById("localVideo").style.display = "none";

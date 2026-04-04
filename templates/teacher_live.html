@@ -3,43 +3,139 @@
 
 {% block title %}授课控制台 - 无障碍教学平台{% endblock %}
 
+{% block extra_head %}
+<style>
+    main.container {
+        max-width: min(1680px, 96vw);
+    }
+
+    .teacher-live-breadcrumb {
+        margin-bottom: 0.5rem;
+        font-size: 0.92rem;
+    }
+
+    .teacher-live-topbar {
+        padding: 0.55rem 0.85rem;
+        background: linear-gradient(180deg, #f8fffc 0%, #eef9f4 100%);
+        border: 1px solid rgba(25, 135, 84, 0.2);
+    }
+
+    .teacher-live-topbar h2 {
+        font-size: 1.05rem;
+        margin-bottom: 0;
+        white-space: nowrap;
+    }
+
+    .teacher-live-meta {
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    .teacher-live-meta .room-badge {
+        font-size: 0.92rem;
+        padding: 0.22rem 0.55rem;
+    }
+
+    .teacher-live-main {
+        min-height: 660px;
+    }
+
+    .teacher-live-main .pdf-frame {
+        min-height: 600px;
+    }
+
+    .teacher-live-sidebar {
+        max-height: 860px;
+    }
+
+    .teacher-live-stage-header {
+        padding: 0.45rem 0.75rem;
+        font-size: 0.96rem;
+    }
+
+    .teacher-live-stage-header .btn {
+        padding: 0.25rem 0.55rem;
+        font-size: 0.82rem;
+    }
+
+    .teacher-live-subtitle {
+        background: linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%);
+        border-top: 1px solid rgba(13, 110, 253, 0.14);
+    }
+
+    .teacher-live-subtitle-label {
+        letter-spacing: 0.08em;
+    }
+
+    .teacher-live-subtitle-text {
+        min-height: 36px;
+        line-height: 1.45;
+    }
+
+    .teacher-live-subtitle.compact {
+        padding: 0.75rem 1rem;
+    }
+
+    @media (max-width: 991.98px) {
+        main.container {
+            max-width: 100%;
+        }
+
+        .teacher-live-topbar h2 {
+            font-size: 1rem;
+        }
+
+        .teacher-live-main {
+            min-height: 460px;
+        }
+
+        .teacher-live-main .pdf-frame {
+            min-height: 400px;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-3">
+<nav aria-label="breadcrumb" class="teacher-live-breadcrumb">
     <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/teacher">老师工作台</a></li>
         <li class="breadcrumb-item active" aria-current="page">授课控制台</li>
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0"><i class="bi bi-broadcast text-primary"></i> 授课控制台</h2>
-    <div class="d-flex gap-2">
-        <a href="/teacher" class="btn btn-outline-secondary" id="btnExitClassroom" title="返回工作台，课堂继续进行">
-            <i class="bi bi-box-arrow-left"></i> 退出课堂
-        </a>
-        <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束本课堂？学生将无法再通过房间号加入。');">
-            <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
-            <button type="submit" class="btn btn-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
-        </form>
-    </div>
-</div>
-
-<div class="alert alert-success mb-3 d-flex justify-content-between align-items-center">
-    <div>
-        <strong>当前课堂：</strong>{{ classroom.name }} | 
-        <strong>房间号：</strong>
-        <span class="badge bg-dark fs-5 user-select-all" id="roomCode">{{ classroom.room_code }}</span>
-        <small class="text-muted ms-2">（请学生输入同一房间号加入）</small>
+<div class="card shadow-sm teacher-live-topbar mb-3">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-nowrap">
+        <div class="d-flex align-items-center gap-3 flex-nowrap overflow-auto pe-2">
+            <h2><i class="bi bi-broadcast text-primary"></i> 授课控制台</h2>
+            <div class="d-flex align-items-center gap-3 flex-nowrap teacher-live-meta text-secondary">
+                <span><strong class="text-dark">课堂：</strong>{{ classroom.name }}</span>
+                <span class="d-flex align-items-center gap-1">
+                    <strong class="text-dark">房间号：</strong>
+                    <span class="badge bg-dark user-select-all room-badge" id="roomCode">{{ classroom.room_code }}</span>
+                </span>
+                <span class="small">学生输入相同房间号即可加入</span>
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-shrink-0">
+            <a href="/teacher" class="btn btn-sm btn-outline-secondary" id="btnExitClassroom" title="返回工作台，课堂继续进行">
+                <i class="bi bi-box-arrow-left"></i> 退出课堂
+            </a>
+            <form method="post" action="/end-classroom" class="d-inline" onsubmit="return confirm('确定结束本课堂？学生将无法再通过房间号加入。');">
+                <input type="hidden" name="classroom_id" value="{{ classroom.id }}">
+                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-stop-circle"></i> 结束课堂</button>
+            </form>
+        </div>
     </div>
 </div>
 
 <div class="row g-3">
-    <!-- 左侧主屏幕区 (占 9 列) -->
-    <div class="col-lg-9 d-flex flex-column gap-3">
+    <!-- 左侧主屏幕区 -->
+    <div class="col-xl-10 col-lg-9 d-flex flex-column gap-3">
         
         <!-- 课件主展示区 -->
         <div class="card shadow-sm flex-grow-1">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center teacher-live-stage-header">
                 <span><i class="bi bi-easel"></i> 课堂主屏幕</span>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-light" id="btnToggleMic"><i class="bi bi-mic-mute"></i> 打开麦克风</button>
@@ -47,7 +143,7 @@
                 </div>
             </div>
             <!-- 主屏幕内容：展示课件 -->
-            <div class="card-body p-0 bg-secondary position-relative" style="min-height: 450px; overflow: hidden;">
+            <div class="card-body p-0 bg-secondary teacher-live-main" style="overflow: hidden;">
                 <div id="mainCoursewareArea" class="w-100 h-100 d-flex align-items-center justify-content-center">
                     <div class="text-center text-white-50">
                         <i class="bi bi-file-earmark-slides" style="font-size: 4rem;"></i>
@@ -55,10 +151,10 @@
                         <p>点击右下角「展示」后，学生端将同步看到此区域内容</p>
                     </div>
                 </div>
-                <div id="teacherSpeechDisplay" class="position-absolute bottom-0 start-0 w-100 p-4 bg-dark bg-opacity-50 text-white" style="backdrop-filter: blur(4px);">
-                    <div class="small text-uppercase opacity-75 mb-1">老师当前发言</div>
-                    <div class="fs-3 fw-semibold" id="teacherSpeechText">等待老师发送字幕...</div>
-                </div>
+            </div>
+            <div id="teacherSpeechDisplay" class="teacher-live-subtitle compact">
+                <div class="small text-uppercase text-primary-emphasis teacher-live-subtitle-label mb-1">老师当前发言</div>
+                <div class="fs-4 fw-semibold text-dark teacher-live-subtitle-text" id="teacherSpeechText">等待老师发送字幕...</div>
             </div>
         </div>
 
@@ -135,11 +231,11 @@
         </div>
     </div>
 
-    <!-- 右侧视频区 (占 3 列) -->
-    <div class="col-lg-3">
+    <!-- 右侧视频区 -->
+    <div class="col-xl-2 col-lg-3">
         <div class="card shadow-sm h-100">
             <div class="card-header bg-info text-white"><i class="bi bi-people"></i> 课堂成员</div>
-            <div class="card-body p-2 bg-light" style="overflow-y: auto; max-height: 700px;" id="videoList">
+            <div class="card-body p-2 bg-light teacher-live-sidebar" style="overflow-y: auto;" id="videoList">
                 
                 <!-- 老师自己的视频 -->
                 <div class="video-container mb-2 position-relative bg-dark rounded shadow-sm" style="aspect-ratio: 4/3; overflow: hidden;">
@@ -185,6 +281,10 @@
     let ws = null;
     let speechRecorder = null;
     let speechChunks = [];
+    let speechRecognition = null;
+    let shouldKeepSpeechRecognition = false;
+    let lastRecognitionPreviewText = "";
+    let liveSubtitleClearTimer = null;
 
     let localStream = null;
     let isCamOn = false;
@@ -230,6 +330,9 @@
                     break;
                 case "subtitle":
                     appendMsg("字幕", msg.content, "text-primary");
+                    updateTeacherSpeechDisplay(msg.content);
+                    break;
+                case "subtitle_live":
                     updateTeacherSpeechDisplay(msg.content);
                     break;
                 case "webrtc_ready":
@@ -285,16 +388,16 @@
         if (mode === "pdf" && fileUrl) {
             const viewerUrl = `${fileUrl}#toolbar=1&navpanes=1&view=FitH`;
             area.innerHTML = `
-                <div class="h-100 w-100 p-2 d-flex flex-column">
-                    <div class="d-flex align-items-center justify-content-between mb-2 text-white">
-                        <div class="fw-bold text-truncate" title="${safeName}">
+                <div class="h-100 w-100 p-1 d-flex flex-column">
+                    <div class="d-flex align-items-center justify-content-between mb-1 px-2 py-1 text-white small">
+                        <div class="fw-semibold text-truncate" title="${safeName}">
                             <i class="bi bi-file-earmark-pdf"></i> ${safeName}
                         </div>
                         <div>
-                            <a href="${fileUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">新窗口打开</a>
+                            <a href="${fileUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light py-0 px-2">新窗口打开</a>
                         </div>
                     </div>
-                    <iframe src="${viewerUrl}" class="w-100 flex-grow-1 border rounded bg-white" title="${safeName}" style="min-height:380px;"></iframe>
+                    <iframe src="${viewerUrl}" class="w-100 flex-grow-1 border rounded bg-white pdf-frame" title="${safeName}"></iframe>
                 </div>
             `;
             return;
@@ -485,6 +588,29 @@
         document.getElementById("studentSignDisplay").textContent = text || "等待学生发起互动...";
     }
 
+    function normalizeRecognitionText(text) {
+        return String(text || "").replace(/\s+/g, " ").trim();
+    }
+
+    function broadcastLiveSubtitle(text) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+        ws.send(JSON.stringify({ type: "subtitle_live", content: text || "" }));
+        return true;
+    }
+
+    function clearLiveSubtitleSoon(delayMs = 1600) {
+        if (liveSubtitleClearTimer) {
+            clearTimeout(liveSubtitleClearTimer);
+        }
+        liveSubtitleClearTimer = window.setTimeout(() => {
+            document.getElementById("subtitleInput").value = "";
+            updateTeacherSpeechDisplay("");
+            broadcastLiveSubtitle("");
+            lastRecognitionPreviewText = "";
+            liveSubtitleClearTimer = null;
+        }, delayMs);
+    }
+
     async function uploadRecordedSpeech(audioBlob) {
         const fd = new FormData();
         const ext = audioBlob.type.includes("mp4") ? "mp4" : "webm";
@@ -503,7 +629,7 @@
 
     function sendSubtitleText(rawText, clearInput = true) {
         const input = document.getElementById("subtitleInput");
-        const text = String(rawText || "").trim();
+        const text = normalizeRecognitionText(rawText);
         if (!text) return false;
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             appendMsg("系统", "未连接到课堂", "text-danger");
@@ -514,10 +640,146 @@
         return true;
     }
 
+    async function ensureSpeechInputReady() {
+        if (!localStream) {
+            isMicOn = true;
+            await toggleMedia();
+        } else if (localStream.getAudioTracks()[0]) {
+            isMicOn = true;
+            localStream.getAudioTracks()[0].enabled = true;
+            updateMediaUI();
+        }
+        const audioTracks = localStream ? localStream.getAudioTracks() : [];
+        if (!audioTracks.length) {
+            throw new Error("未检测到可用麦克风");
+        }
+    }
+
+    function setupRealtimeSpeechRecognition() {
+        const startBtn = document.getElementById("btnStartSpeechRecognition");
+        const stopBtn = document.getElementById("btnStopSpeechRecognition");
+        const statusEl = document.getElementById("speechRecognitionStatus");
+        const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!RecognitionCtor) {
+            return false;
+        }
+
+        speechRecognition = new RecognitionCtor();
+        speechRecognition.lang = "zh-CN";
+        speechRecognition.continuous = true;
+        speechRecognition.interimResults = true;
+        speechRecognition.maxAlternatives = 1;
+
+        speechRecognition.onstart = () => {
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            statusEl.textContent = "实时识别中，老师说话时会自动同步字幕。";
+        };
+
+        speechRecognition.onerror = (event) => {
+            const err = event && event.error ? event.error : "unknown";
+            statusEl.textContent = err === "not-allowed"
+                ? "浏览器未授予语音识别权限。"
+                : "实时识别异常：" + err;
+        };
+
+        speechRecognition.onresult = (event) => {
+            if (liveSubtitleClearTimer) {
+                clearTimeout(liveSubtitleClearTimer);
+                liveSubtitleClearTimer = null;
+            }
+            let finalText = "";
+            let interimText = "";
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                const transcript = normalizeRecognitionText(event.results[i][0] && event.results[i][0].transcript);
+                if (!transcript) continue;
+                if (event.results[i].isFinal) {
+                    finalText = normalizeRecognitionText(`${finalText} ${transcript}`);
+                } else {
+                    interimText = normalizeRecognitionText(`${interimText} ${transcript}`);
+                }
+            }
+
+            if (finalText) {
+                sendSubtitleText(finalText, false);
+                document.getElementById("subtitleInput").value = finalText;
+                updateTeacherSpeechDisplay(finalText);
+                broadcastLiveSubtitle(finalText);
+                lastRecognitionPreviewText = finalText;
+                clearLiveSubtitleSoon();
+            }
+
+            const previewText = normalizeRecognitionText(interimText);
+            if (previewText) {
+                document.getElementById("subtitleInput").value = previewText;
+                updateTeacherSpeechDisplay(previewText);
+            }
+            if (previewText !== lastRecognitionPreviewText) {
+                broadcastLiveSubtitle(previewText || "");
+                lastRecognitionPreviewText = previewText;
+            }
+        };
+
+        speechRecognition.onend = () => {
+            if (shouldKeepSpeechRecognition) {
+                try {
+                    speechRecognition.start();
+                    return;
+                } catch (err) {
+                    statusEl.textContent = "实时识别重启失败：" + err.message;
+                }
+            }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            statusEl.textContent = lastRecognitionPreviewText ? "实时识别已停止。" : "点击开始后将实时同步老师字幕。";
+            document.getElementById("subtitleInput").value = "";
+            updateTeacherSpeechDisplay("");
+            broadcastLiveSubtitle("");
+            lastRecognitionPreviewText = "";
+        };
+
+        startBtn.addEventListener("click", async () => {
+            try {
+                await ensureSpeechInputReady();
+                shouldKeepSpeechRecognition = true;
+                lastRecognitionPreviewText = "";
+                if (liveSubtitleClearTimer) {
+                    clearTimeout(liveSubtitleClearTimer);
+                    liveSubtitleClearTimer = null;
+                }
+                document.getElementById("subtitleInput").value = "";
+                speechRecognition.start();
+            } catch (err) {
+                shouldKeepSpeechRecognition = false;
+                statusEl.textContent = "无法启动实时识别：" + err.message;
+            }
+        });
+
+        stopBtn.addEventListener("click", () => {
+            shouldKeepSpeechRecognition = false;
+            if (speechRecognition) {
+                try {
+                    speechRecognition.stop();
+                } catch (err) {
+                    statusEl.textContent = "停止实时识别失败：" + err.message;
+                }
+            }
+        });
+
+        statusEl.textContent = "点击开始后将实时同步老师字幕。";
+        startBtn.innerHTML = '<i class="bi bi-mic"></i> 开始实时识别';
+        stopBtn.innerHTML = '<i class="bi bi-stop-circle"></i> 停止实时识别';
+        return true;
+    }
+
     function setupSpeechRecognition() {
         const startBtn = document.getElementById("btnStartSpeechRecognition");
         const stopBtn = document.getElementById("btnStopSpeechRecognition");
         const statusEl = document.getElementById("speechRecognitionStatus");
+        if (setupRealtimeSpeechRecognition()) {
+            return;
+        }
         if (!window.MediaRecorder) {
             statusEl.textContent = "当前浏览器不支持录音识别，请手动输入字幕。";
             startBtn.disabled = true;
@@ -526,18 +788,7 @@
 
         startBtn.addEventListener("click", async () => {
             try {
-                if (!localStream) {
-                    isMicOn = true;
-                    await toggleMedia();
-                } else if (localStream.getAudioTracks()[0]) {
-                    isMicOn = true;
-                    localStream.getAudioTracks()[0].enabled = true;
-                    updateMediaUI();
-                }
-                const audioTracks = localStream ? localStream.getAudioTracks() : [];
-                if (!audioTracks.length) {
-                    throw new Error("未检测到可用麦克风");
-                }
+                await ensureSpeechInputReady();
                 speechChunks = [];
                 const mimeType = MediaRecorder.isTypeSupported("audio/webm")
                     ? "audio/webm"
@@ -578,7 +829,7 @@
                     }
                 };
                 speechRecorder.start();
-                statusEl.textContent = "录音中，请点击“停止识别”结束。";
+                statusEl.textContent = "当前浏览器不支持实时识别，正在录音，停止后会统一识别。";
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
             } catch (err) {
