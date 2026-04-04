@@ -56,7 +56,7 @@
                     </div>
                 </div>
                 <div id="teacherSpeechDisplay" class="position-absolute bottom-0 start-0 w-100 p-4 bg-dark bg-opacity-50 text-white" style="backdrop-filter: blur(4px);">
-                    <div class="small text-uppercase opacity-75 mb-1">老师当前发言</div>
+                    <div class="small text-uppercase opacity-75 mb-1">课堂字幕</div>
                     <div class="fs-3 fw-semibold" id="teacherSpeechText">等待老师发送字幕...</div>
                 </div>
             </div>
@@ -70,22 +70,22 @@
                     <div class="card-body d-flex flex-column">
                         <div class="mb-2">
                             <div class="input-group">
-                                <input type="text" id="subtitleInput" class="form-control" placeholder="输入授课文字或语音识别结果...">
+                                <input type="text" id="subtitleInput" class="form-control" placeholder="手动输入字幕后点「发送字幕」">
                                 <button class="btn btn-primary" id="btnSendSubtitle">发送字幕</button>
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             <button class="btn btn-outline-primary btn-sm" id="btnStartSpeechRecognition" type="button">
-                                <i class="bi bi-mic"></i> 开始语音识别
+                                <i class="bi bi-mic"></i> 开启字幕
                             </button>
                             <button class="btn btn-outline-secondary btn-sm" id="btnStopSpeechRecognition" type="button" disabled>
-                                <i class="bi bi-stop-circle"></i> 停止识别
+                                <i class="bi bi-stop-circle"></i> 关闭字幕
                             </button>
-                            <span class="small text-muted align-self-center" id="speechRecognitionStatus">可将识别结果直接回填到字幕框。</span>
+                            <span class="small text-muted align-self-center" id="speechRecognitionStatus">开启后自动录音，停顿约 1.2 秒后自动识别并显示在主屏幕；点「关闭字幕」结束。</span>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="autoSendRecognizedSubtitle" checked>
-                            <label class="form-check-label small" for="autoSendRecognizedSubtitle">识别完成后自动发送为课堂字幕</label>
+                            <label class="form-check-label small" for="autoSendRecognizedSubtitle">识别完成后自动发到主屏幕；新一段会替换上一段字幕</label>
                         </div>
                         <div class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto;" id="messageArea">
                             <p class="text-muted text-center small mt-2">课堂消息将显示在这里...</p>
@@ -185,6 +185,10 @@
     let ws = null;
     let speechRecorder = null;
     let speechChunks = [];
+    /** 连续课堂字幕：静音自动切段识别，无需每次点「关闭字幕」 */
+    let subtitleLoopActive = false;
+    let speechSubtitleRafId = null;
+    let speechSubtitleMaxTimer = null;
 
     let localStream = null;
     let isCamOn = false;
@@ -229,7 +233,7 @@
                     updateStudentSignDisplay(msg.content);
                     break;
                 case "subtitle":
-                    appendMsg("字幕", msg.content, "text-primary");
+                    // 字幕只显示在课堂主屏幕底部，避免与下方互动区重复
                     updateTeacherSpeechDisplay(msg.content);
                     break;
                 case "webrtc_ready":
@@ -514,6 +518,16 @@
         return true;
     }
 
+    function _rmsLevel(analyser, scratch) {
+        analyser.getByteTimeDomainData(scratch);
+        let s = 0;
+        for (let i = 0; i < scratch.length; i++) {
+            const v = (scratch[i] - 128) / 128;
+            s += v * v;
+        }
+        return Math.sqrt(s / scratch.length);
+    }
+
     function setupSpeechRecognition() {
         const startBtn = document.getElementById("btnStartSpeechRecognition");
         const stopBtn = document.getElementById("btnStopSpeechRecognition");
@@ -524,7 +538,169 @@
             return;
         }
 
+        const SILENCE_MS = 1200;
+        const MIN_SPEECH_BEFORE_SILENCE_MS = 500;
+        const MAX_SEGMENT_MS = 25000;
+        const LEVEL_SPEECH = 0.028;
+        const LEVEL_SILENCE = 0.018;
+
+        function stopSubtitleLoopUi() {
+            subtitleLoopActive = false;
+            if (speechSubtitleRafId != null) {
+                cancelAnimationFrame(speechSubtitleRafId);
+                speechSubtitleRafId = null;
+            }
+            if (speechSubtitleMaxTimer != null) {
+                clearTimeout(speechSubtitleMaxTimer);
+                speechSubtitleMaxTimer = null;
+            }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+
+        async function processRecordedSegment() {
+            const recordedType = speechRecorder && speechRecorder.mimeType
+                ? speechRecorder.mimeType
+                : (speechChunks[0] && speechChunks[0].type) || "audio/webm";
+            const audioBlob = new Blob(speechChunks, { type: recordedType });
+            speechChunks = [];
+            if (!audioBlob.size) {
+                if (subtitleLoopActive) statusEl.textContent = "未录到有效片段，继续聆听…";
+                return;
+            }
+            statusEl.textContent = "正在识别本段语音…";
+            try {
+                const normalized = await uploadRecordedSpeech(audioBlob);
+                const input = document.getElementById("subtitleInput");
+                const autoSend = document.getElementById("autoSendRecognizedSubtitle").checked;
+                if (autoSend) {
+                    // 每段只保留当前识别结果，覆盖上一段字幕（主屏幕 + 广播）
+                    const sent = sendSubtitleText(normalized, true);
+                    if (sent) updateTeacherSpeechDisplay(normalized);
+                    statusEl.textContent = sent
+                        ? (subtitleLoopActive ? "本段已上屏（已替换上一段），继续说话即可…" : "字幕已更新在主屏幕。")
+                        : "识别完成，但当前未连接课堂。";
+                } else {
+                    input.value = normalized;
+                    statusEl.textContent = subtitleLoopActive
+                        ? "本段已替换输入框内容，可编辑后发送；继续说话将录入下一段。"
+                        : "识别完成，结果已填入上方输入框。";
+                }
+            } catch (err) {
+                statusEl.textContent = err.message || "识别失败";
+            }
+        }
+
+        function beginSubtitleSegment() {
+            if (!subtitleLoopActive) return;
+            const audioTracks = localStream ? localStream.getAudioTracks() : [];
+            if (!audioTracks.length) {
+                statusEl.textContent = "未检测到麦克风，已停止字幕。";
+                stopSubtitleLoopUi();
+                return;
+            }
+
+            speechChunks = [];
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+                ? "audio/webm"
+                : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+            const rec = mimeType
+                ? new MediaRecorder(new MediaStream(audioTracks), { mimeType })
+                : new MediaRecorder(new MediaStream(audioTracks));
+            speechRecorder = rec;
+
+            let audioCtx = null;
+            let analyser = null;
+            let scratch = null;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                src.connect(analyser);
+                scratch = new Uint8Array(analyser.fftSize);
+            } catch (e) {
+                console.warn("音量检测不可用，将按最长时间自动切段", e);
+            }
+
+            const t0 = performance.now();
+            let silenceStart = null;
+            let heardSpeech = false;
+
+            function cleanupAnalyser() {
+                try {
+                    if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
+                } catch (e) { /* ignore */ }
+                audioCtx = null;
+                analyser = null;
+                scratch = null;
+            }
+
+            rec.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) speechChunks.push(event.data);
+            };
+            rec.onerror = () => {
+                statusEl.textContent = "录音失败，请检查麦克风权限。";
+                cleanupAnalyser();
+                stopSubtitleLoopUi();
+            };
+            rec.onstop = async () => {
+                if (speechSubtitleRafId != null) {
+                    cancelAnimationFrame(speechSubtitleRafId);
+                    speechSubtitleRafId = null;
+                }
+                if (speechSubtitleMaxTimer != null) {
+                    clearTimeout(speechSubtitleMaxTimer);
+                    speechSubtitleMaxTimer = null;
+                }
+                cleanupAnalyser();
+                await processRecordedSegment();
+                if (subtitleLoopActive) {
+                    window.setTimeout(() => beginSubtitleSegment(), 120);
+                } else {
+                    stopSubtitleLoopUi();
+                    statusEl.textContent = "已关闭字幕。";
+                }
+            };
+
+            rec.start();
+
+            speechSubtitleMaxTimer = window.setTimeout(() => {
+                if (rec.state === "recording") rec.stop();
+            }, MAX_SEGMENT_MS);
+
+            function tick() {
+                if (!subtitleLoopActive || rec.state !== "recording") return;
+                const elapsed = performance.now() - t0;
+                if (analyser && scratch) {
+                    const level = _rmsLevel(analyser, scratch);
+                    if (level >= LEVEL_SPEECH) heardSpeech = true;
+                    if (heardSpeech && elapsed >= MIN_SPEECH_BEFORE_SILENCE_MS) {
+                        if (level <= LEVEL_SILENCE) {
+                            if (!silenceStart) silenceStart = performance.now();
+                            else if (performance.now() - silenceStart >= SILENCE_MS) {
+                                rec.stop();
+                                return;
+                            }
+                        } else {
+                            silenceStart = null;
+                        }
+                    }
+                } else if (elapsed >= MAX_SEGMENT_MS) {
+                    rec.stop();
+                    return;
+                }
+                speechSubtitleRafId = requestAnimationFrame(tick);
+            }
+            speechSubtitleRafId = requestAnimationFrame(tick);
+            statusEl.textContent = "聆听中，说完停顿片刻将自动识别…";
+        }
+
         startBtn.addEventListener("click", async () => {
+            if (subtitleLoopActive) {
+                statusEl.textContent = "字幕已在开启中；请先点「关闭字幕」。";
+                return;
+            }
             try {
                 if (!localStream) {
                     isMicOn = true;
@@ -538,57 +714,25 @@
                 if (!audioTracks.length) {
                     throw new Error("未检测到可用麦克风");
                 }
-                speechChunks = [];
-                const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-                    ? "audio/webm"
-                    : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
-                speechRecorder = mimeType
-                    ? new MediaRecorder(new MediaStream(audioTracks), { mimeType })
-                    : new MediaRecorder(new MediaStream(audioTracks));
-                speechRecorder.ondataavailable = (event) => {
-                    if (event.data && event.data.size > 0) speechChunks.push(event.data);
-                };
-                speechRecorder.onerror = () => {
-                    statusEl.textContent = "录音失败，请检查麦克风权限。";
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                };
-                speechRecorder.onstop = async () => {
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                    const recordedType = speechRecorder.mimeType || (speechChunks[0] && speechChunks[0].type) || "audio/webm";
-                    const audioBlob = new Blob(speechChunks, { type: recordedType });
-                    if (!audioBlob.size) {
-                        statusEl.textContent = "未录到有效语音，请重试。";
-                        return;
-                    }
-                    statusEl.textContent = "正在用 Whisper 识别...";
-                    try {
-                        const normalized = await uploadRecordedSpeech(audioBlob);
-                        const input = document.getElementById("subtitleInput");
-                        input.value = normalized;
-                        if (document.getElementById("autoSendRecognizedSubtitle").checked) {
-                            const sent = sendSubtitleText(normalized, true);
-                            statusEl.textContent = sent ? "识别完成，已自动发送字幕。" : "识别完成，但当前未连接课堂。";
-                        } else {
-                            statusEl.textContent = "识别完成，结果已回填到字幕框。";
-                        }
-                    } catch (err) {
-                        statusEl.textContent = err.message;
-                    }
-                };
-                speechRecorder.start();
-                statusEl.textContent = "录音中，请点击“停止识别”结束。";
+                subtitleLoopActive = true;
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
+                beginSubtitleSegment();
             } catch (err) {
-                statusEl.textContent = "无法启动录音识别：" + err.message;
+                subtitleLoopActive = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusEl.textContent = "无法启动字幕：" + err.message;
             }
         });
 
         stopBtn.addEventListener("click", () => {
+            subtitleLoopActive = false;
             if (speechRecorder && speechRecorder.state !== "inactive") {
                 speechRecorder.stop();
+            } else {
+                stopSubtitleLoopUi();
+                statusEl.textContent = "已关闭字幕。";
             }
         });
     }

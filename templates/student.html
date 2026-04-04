@@ -5,7 +5,7 @@
 
 {% block content %}
 <h2 class="mb-2"><i class="bi bi-book-half text-primary"></i> 学习端</h2>
-<p class="text-muted mb-4">您可在同一页面按需使用实时文字、评论互动与课件朗读等功能，无需在注册时做类别选择。</p>
+<p class="text-muted mb-4">您可在同一页面按需使用实时字幕、评论互动与课件管理（预览与朗读）等功能，无需在注册时做类别选择。</p>
 
 <div class="row g-4 mb-3">
     <div class="col-12">
@@ -54,13 +54,13 @@
                     </div>
                 </div>
                 <div id="teacherSpeechDisplay" class="position-absolute bottom-0 start-0 w-100 p-4 bg-dark bg-opacity-50 text-white" style="backdrop-filter: blur(4px);">
-                    <div class="small text-uppercase opacity-75 mb-1">老师当前发言</div>
+                    <div class="small text-uppercase opacity-75 mb-1">课堂字幕</div>
                     <div class="fs-3 fw-semibold" id="teacherSpeechText">等待老师发送字幕...</div>
                 </div>
             </div>
         </div>
 
-        <!-- 底部控制区：字幕与课件朗读 -->
+        <!-- 底部控制区：互动与课件管理 -->
         <div class="row g-3">
             <div class="col-md-7">
                 <div class="card shadow-sm h-100">
@@ -107,7 +107,7 @@
             </div>
             <div class="col-md-5">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-dark text-white"><i class="bi bi-file-earmark-text"></i> 课件文字朗读</div>
+                    <div class="card-header bg-dark text-white"><i class="bi bi-folder2-open"></i> 课件管理</div>
                     <div class="card-body" style="overflow-y: auto; max-height: 250px;">
                         <ul class="list-group list-group-flush mb-2" id="coursewareList">
                             <li class="list-group-item text-muted text-center border-0 py-1">等待加载...</li>
@@ -383,7 +383,7 @@
                     }
                     break;
                 case "subtitle":
-                    appendLine("字幕", msg.content, "text-primary");
+                    // 与老师端一致：字幕仅在主屏幕底部展示，下方互动区不再重复一行
                     updateTeacherSpeechDisplay(msg.content);
                     if (autoSpeakSubtitles && msg.content) speak(msg.content);
                     break;

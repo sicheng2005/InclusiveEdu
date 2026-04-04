@@ -5,7 +5,8 @@ python-multipart
 aiofiles
 python-pptx
 PyMuPDF
-mlx-whisper
+faster-whisper
+mlx-whisper; platform_system == "Darwin" and platform_machine == "arm64"
 imageio-ffmpeg
 transformers
 python-docx

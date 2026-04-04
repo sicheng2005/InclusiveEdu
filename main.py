@@ -625,8 +625,9 @@ async def api_recognize_speech(
     recognized_text = _clean_recognition_text(text)
     saved_path = None
     try:
-        if audio and audio.filename:
-            ext = os.path.splitext(audio.filename)[1] or ".webm"
+        if audio:
+            fname = audio.filename or "speech.webm"
+            ext = os.path.splitext(fname)[1] or ".webm"
             saved_name = f"speech_{uuid.uuid4().hex}{ext}"
             saved_path = os.path.join(UPLOAD_DIR, saved_name)
             with open(saved_path, "wb") as f:
