@@ -309,12 +309,24 @@ def _preview_pdf_path(file_path: str) -> str:
     return f"{root}.preview.pdf"
 
 
+def _find_soffice() -> str | None:
+    candidates = [
+        shutil.which("soffice"),
+        shutil.which("libreoffice"),
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
+
 def _convert_office_to_pdf(file_path: str) -> tuple[bool, str]:
     """
     将 doc/docx/pptx 转为 pdf 预览文件。
     需要系统可用的 LibreOffice/soffice。
     """
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    soffice = _find_soffice()
     if not soffice:
         # Windows 兜底：尝试使用本机 Office COM 导出 PDF
         return _convert_office_to_pdf_windows(file_path)
@@ -609,7 +621,20 @@ async def api_courseware_text(
     cw = get_courseware_by_id(cw_id)
     if not cw or cw["classroom_id"] is None or int(cw["classroom_id"]) != int(classroom_id):
         return JSONResponse({"error": "课件不存在或无权访问"}, status_code=404)
-    return JSONResponse({"text": cw["text_content"], "name": cw["original_name"]})
+    ext = _courseware_ext(cw)
+    file_path = _courseware_file_path(cw)
+    pages = []
+    if os.path.exists(file_path):
+        pages = await asyncio.to_thread(_extract_pages, file_path, ext)
+    text = cw["text_content"] or ""
+    if not pages:
+        pages = [text or "（暂无可提取文本）"]
+    return JSONResponse({
+        "text": text,
+        "name": cw["original_name"],
+        "pages": pages,
+        "page_count": len(pages),
+    })
 
 
 @app.post("/api/recognize/speech")
@@ -902,6 +927,47 @@ def _extract_text(file_path: str, ext: str) -> str:
         return f"[缺少依赖库: {e}，请 pip install 对应包]"
     except Exception as e:
         return f"[提取失败: {e}]"
+
+
+def _extract_pages(file_path: str, ext: str) -> list[str]:
+    ext = (ext or "").lower()
+    try:
+        if ext == ".pptx":
+            from pptx import Presentation
+
+            prs = Presentation(file_path)
+            pages = []
+            for slide in prs.slides:
+                parts = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text and shape.text.strip():
+                        parts.append(shape.text.strip())
+                pages.append("\n".join(parts).strip() or "（本页暂无可提取文本）")
+            return pages or ["（暂无可提取文本）"]
+        if ext == ".pdf":
+            import fitz
+
+            doc = fitz.open(file_path)
+            try:
+                pages = []
+                for page in doc:
+                    text = (page.get_text() or "").strip()
+                    pages.append(text or "（本页暂无可提取文本）")
+                return pages or ["（暂无可提取文本）"]
+            finally:
+                doc.close()
+        if ext in (".doc", ".docx"):
+            from docx import Document
+
+            doc = Document(file_path)
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            return [text or "（暂无可提取文本）"]
+        if ext == ".txt":
+            with open(file_path, encoding="utf-8") as f:
+                return [f.read() or "（暂无可提取文本）"]
+    except Exception:
+        pass
+    return []
 
 # ---------------------------------------------------------------------------
 # 启动
