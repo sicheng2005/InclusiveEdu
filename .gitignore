@@ -26,7 +26,8 @@ uploads/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 *.swp
 
 # 系统
@@ -35,3 +36,5 @@ Thumbs.db
 
 # 本地工具（勿提交到仓库）
 cloudflared.exe
+
+

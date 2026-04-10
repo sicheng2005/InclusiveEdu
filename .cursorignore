@@ -1,0 +1,13 @@
+﻿venv/
+.venv/
+slrt_vendor/
+node_modules/
+*.ckpt
+*.bin
+*.pt
+*.pth
+*.pkl
+*.onnx
+*.safetensors
+__pycache__/
+.git/

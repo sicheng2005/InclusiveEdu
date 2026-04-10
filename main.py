@@ -15,6 +15,35 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+import urllib.request
+import urllib.error
+
+def _load_dotenv_if_present():
+    """
+    轻量加载本地 .env（不引入第三方依赖）。
+    仅用于开发/比赛演示，配合 .gitignore 避免密钥入库。
+    """
+    base_dir = os.path.dirname(__file__)
+    env_path = os.path.join(base_dir, ".env")
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("'").strip('"')
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except Exception:
+        # .env 读取失败不影响主流程
+        return
+
+
+_load_dotenv_if_present()
 
 from database import (
     init_db, create_user, get_user_by_username, get_user_by_id,
@@ -24,7 +53,6 @@ from database import (
     get_classrooms_by_teacher, get_classroom_by_id_and_teacher, end_classroom_for_teacher,
     session_create, session_get_user_id, session_delete,
 )
-from core_models.sign_model import recognize_sign, recognize_sign_video
 from core_models.stt_model import speech_to_text
 
 app = FastAPI(title="无障碍线上教学辅助平台")
@@ -536,6 +564,12 @@ def _clean_recognition_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text
 
+
+def _clean_sign_translation_text(text: str) -> str:
+    text = (text or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
 @app.post("/api/register", summary="用户注册接口")
 async def api_register(req: RegisterRequest):
     if req.role not in ("teacher", "student"):
@@ -674,78 +708,128 @@ async def api_recognize_speech(
 @app.post("/api/recognize/sign")
 async def api_recognize_sign(
     request: Request,
-    text: str = Form(None),
-    image: UploadFile | None = File(None),
     video: UploadFile | None = File(None),
 ):
-    user = _current_user(request)
-    if not _is_student(user):
-        return JSONResponse({"success": False, "error": "仅学生可使用手语识别"}, status_code=403)
+    """
+    学生端手语翻译（视频片段 -> 中文文字）。
 
-    recognized_text = _clean_recognition_text(text)
+    说明：本接口默认提供可跑通的占位实现；如需接入真实模型推理，请启动独立推理服务，
+    并通过环境变量 SIGN_INFER_URL 指向该服务（例如 http://127.0.0.1:9001/infer）。
+    """
+    user = _current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "未登录"}, status_code=401)
+    if not video:
+        return JSONResponse({"success": False, "error": "请上传视频片段"}, status_code=400)
+
     saved_path = None
     try:
-        if video and video.filename:
-            ext = os.path.splitext(video.filename)[1] or ".webm"
-            saved_name = f"sign_{uuid.uuid4().hex}{ext}"
-            saved_path = os.path.join(UPLOAD_DIR, saved_name)
-            with open(saved_path, "wb") as f:
-                f.write(await video.read())
-            sign_result = recognize_sign_video(saved_path)
-            recognized_text = _clean_recognition_text(sign_result.get("text", ""))
-            note = sign_result.get("note", "")
-            label = sign_result.get("label", "")
-            confidence = float(sign_result.get("confidence", 0.0))
-            action = sign_result.get("action", "append")
-            samples = int(sign_result.get("samples", 0))
-        elif image and image.filename:
-            ext = os.path.splitext(image.filename)[1] or ".png"
-            saved_name = f"sign_{uuid.uuid4().hex}{ext}"
-            saved_path = os.path.join(UPLOAD_DIR, saved_name)
-            with open(saved_path, "wb") as f:
-                f.write(await image.read())
-            sign_result = recognize_sign(saved_path)
-            recognized_text = _clean_recognition_text(sign_result.get("text", ""))
-            note = sign_result.get("note", "")
-            label = sign_result.get("label", "")
-            confidence = float(sign_result.get("confidence", 0.0))
-            action = sign_result.get("action", "append")
-        else:
-            sign_result = {
-                "text": recognized_text,
-                "label": "manual",
-                "confidence": 1.0 if recognized_text else 0.0,
-                "action": "append",
-                "note": "手动输入",
-            }
-            note = sign_result["note"]
-            label = sign_result["label"]
-            confidence = sign_result["confidence"]
-            action = sign_result["action"]
-            samples = 1
+        fname = video.filename or "sign.webm"
+        ext = os.path.splitext(fname)[1] or ".webm"
+        saved_name = f"sign_{uuid.uuid4().hex}{ext}"
+        saved_path = os.path.join(UPLOAD_DIR, saved_name)
+        with open(saved_path, "wb") as f:
+            f.write(await video.read())
 
-        if not recognized_text and action in ("noop", "append"):
-            return JSONResponse({
-                "success": False,
-                "error": note or "未获取到可识别的手语内容",
-                "label": label,
-                "confidence": confidence,
-                "samples": samples,
-            }, status_code=400)
+        # 1) 默认占位：返回提示文本（保证前后端联调可跑通）
+        # 2) 若配置了推理服务，则转发请求（后续你接入 SLRT 就填这里）
+        infer_url = (os.environ.get("SIGN_INFER_URL") or "").strip()
+        if not infer_url:
+            mock = os.environ.get("SIGN_MOCK_TEXT", "（手语翻译功能待接入 SLRT 推理服务）")
+            return JSONResponse({"success": True, "text": _clean_sign_translation_text(mock), "mode": "mock"})
 
-        return JSONResponse({
-            "success": True,
-            "text": recognized_text,
-            "label": label,
-            "confidence": confidence,
-            "action": action,
-            "note": note,
-            "samples": samples,
-        })
+        # 轻量实现：将本地视频路径交给推理脚本（避免在此处实现 multipart 转发依赖 requests）
+        # 约定：推理服务支持接受 JSON: {"video_path": "..."}，返回 {"success": true, "text": "..."}
+        try:
+            payload = json.dumps({"video_path": os.path.abspath(saved_path)}, ensure_ascii=False).encode("utf-8")
+            req_obj = urllib.request.Request(
+                infer_url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req_obj, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            # 推理服务常以 500 返回 JSON：{ "success": false, "error": "..." }，需读出 body 才能看到真正原因
+            raw = e.read().decode("utf-8", errors="replace")
+            try:
+                err_body = json.loads(raw) if raw.strip() else {}
+            except json.JSONDecodeError:
+                err_body = {}
+            detail = (err_body.get("error") or raw or str(e)).strip()
+            return JSONResponse(
+                {"success": False, "error": f"手语推理服务错误 ({e.code}): {detail}"},
+                status_code=502,
+            )
+        except Exception as e:
+            return JSONResponse({"success": False, "error": f"手语推理服务调用失败: {e}"}, status_code=502)
+
+        if not isinstance(data, dict) or not data.get("success"):
+            return JSONResponse({"success": False, "error": (data or {}).get("error") or "手语翻译失败"}, status_code=500)
+
+        text = _clean_sign_translation_text(data.get("text") or "")
+        if not text:
+            return JSONResponse({"success": False, "error": "未识别到有效手语内容"}, status_code=400)
+        return JSONResponse({"success": True, "text": text, "mode": "infer"})
     finally:
         if saved_path and os.path.exists(saved_path):
-            os.remove(saved_path)
+            try:
+                os.remove(saved_path)
+            except Exception:
+                pass
 
+
+class SummarizeRequest(BaseModel):
+    text: str
+
+@app.post("/api/llm/summarize")
+def api_llm_summarize(req: SummarizeRequest, request: Request):
+    user = _current_user(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "未登录"}, status_code=401)
+        
+    text = req.text.strip()
+    if not text:
+        return JSONResponse({"success": False, "error": "当前课件页没有提取到文本内容"})
+
+    # 比赛演示用：如果没有配置 API Key，直接返回一个模拟的总结
+    api_key = os.environ.get("LLM_API_KEY", "")
+    if not api_key:
+        preview = text[:30].replace('\n', ' ') + "..." if len(text) > 30 else text
+        summary = f"【AI 总结】本页核心知识点如下：\n1. {preview}\n2. 请重点掌握上述概念。\n\n（注：在环境变量配置 LLM_API_KEY 后可接入真实大模型）"
+        return JSONResponse({"success": True, "summary": summary, "mode": "mock"})
+
+    # 真实大模型调用（以 DeepSeek 为例，兼容 OpenAI 格式）
+    try:
+        url = "https://api.deepseek.com/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        data = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": (
+                    "你是融合教育课堂的AI助教。请基于下面这一页PPT文本，输出结构化总结，要求：\n"
+                    "1) 先给出一句话总括（不超过20字）。\n"
+                    "2) 再给出“核心要点”2-4条，每条不超过18字。\n"
+                    "3) 再给出“关键词”3-6个（用顿号分隔）。\n"
+                    "4) 最后给出“一句话记忆”（不超过25字）。\n"
+                    "语言要清晰、口语化，适合听障/视障学生。不要编造PPT不存在的信息。"
+                )},
+                {"role": "user", "content": text}
+            ],
+            "max_tokens": 300,
+            "temperature": 0.5
+        }
+        req_obj = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req_obj, timeout=10) as response:
+            resp_data = json.loads(response.read().decode("utf-8"))
+            summary = resp_data["choices"][0]["message"]["content"]
+            return JSONResponse({"success": True, "summary": summary, "mode": "deepseek", "model": "deepseek-chat"})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"大模型调用失败: {str(e)}"})
 
 @app.get("/api/courseware/{cw_id}/display")
 async def api_courseware_display(
@@ -771,6 +855,8 @@ async def api_courseware_display(
             "mode": "pdf",
             "name": cw["original_name"],
             "file_url": f"{file_url_base}&variant=original",
+            # 学生端朗读使用（PDF 也尽量提供可朗读文本）
+            "text": cw["text_content"] or "（暂无可朗读文本）",
         })
 
     # PPT/Word：优先使用预生成（或即时生成）的 PDF 预览
@@ -788,6 +874,8 @@ async def api_courseware_display(
             "mode": "pdf",
             "name": cw["original_name"],
             "file_url": f"{file_url_base}&variant=preview",
+            # 学生端朗读使用（展示 PDF 预览时也同步下发提取到的文本）
+            "text": cw["text_content"] or "（暂无可朗读文本）",
         })
 
     # 其他格式维持文本展示
@@ -975,6 +1063,33 @@ def _extract_pages(file_path: str, ext: str) -> list[str]:
 
 if __name__ == "__main__":
     import uvicorn
+    import subprocess
+    import sys
+    import atexit
+
     print("正在启动无障碍线上教学辅助平台...")
+
+    # 自动启动手语推理服务子进程
+    env = os.environ.copy()
+    env["SLRT_ENABLE_REAL_INFER"] = "1"
+    env["SLRT_CONFIG"] = os.path.join("slrt_vendor", "TwoStreamNetwork", "experiments", "configs", "TwoStream", "csl-daily_s2t_video.yaml")
+    env["SLRT_CKPT"] = os.path.join("slrt_vendor", "TwoStreamNetwork", "ckpts", "best.ckpt")
+    
+    # 让主服务知道推理服务的地址
+    os.environ["SIGN_INFER_URL"] = "http://127.0.0.1:9001/infer"
+
+    print("正在后台启动 SLRT 手语推理服务...")
+    infer_process = subprocess.Popen(
+        [sys.executable, "slrt_infer_service.py"],
+        env=env
+    )
+
+    def cleanup():
+        print("正在关闭 SLRT 手语推理服务...")
+        infer_process.terminate()
+        infer_process.wait()
+
+    atexit.register(cleanup)
+
     print("请在浏览器中打开: http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)

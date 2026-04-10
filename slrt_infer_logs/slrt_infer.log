@@ -1,0 +1,19 @@
+2026-04-10 03:24:21,190 Initialize translation network from pretrained_models/mBart_zh/
+2026-04-10 03:24:21,619 gloss2embed_file pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:24:23,923 Initialize gloss embedding from pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:34:45,896 Initialize translation network from pretrained_models/mBart_zh/
+2026-04-10 03:34:46,244 gloss2embed_file pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:34:47,420 Initialize gloss embedding from pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:34:47,444 <si> not in gls2embed, set fc to zero
+2026-04-10 03:39:19,596 Initialize translation network from pretrained_models/mBart_zh/
+2026-04-10 03:39:20,003 gloss2embed_file pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:39:21,195 Initialize gloss embedding from pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 03:39:21,229 <si> not in gls2embed, set fc to zero
+2026-04-10 17:26:32,270 Initialize translation network from pretrained_models/mBart_zh/
+2026-04-10 17:26:32,676 gloss2embed_file pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 17:26:33,681 Initialize gloss embedding from pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 17:26:33,695 <si> not in gls2embed, set fc to zero
+2026-04-10 20:26:04,962 Initialize translation network from pretrained_models/mBart_zh/
+2026-04-10 20:26:05,338 gloss2embed_file pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 20:26:06,252 Initialize gloss embedding from pretrained_models/mBart_zh/gloss_embeddings.bin
+2026-04-10 20:26:06,267 <si> not in gls2embed, set fc to zero

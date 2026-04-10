@@ -45,7 +45,6 @@
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-easel"></i> 课堂主屏幕</span>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-light" id="btnReadTeacherSpeech" type="button"><i class="bi bi-volume-up"></i> 朗读老师发言</button>
                     <button class="btn btn-sm btn-outline-light" id="btnFullscreenMain" type="button"><i class="bi bi-arrows-fullscreen"></i> 全屏</button>
                     <button class="btn btn-sm btn-outline-light" id="btnToggleMic"><i class="bi bi-mic-mute"></i> 打开麦克风</button>
                     <button class="btn btn-sm btn-outline-light" id="btnToggleCam"><i class="bi bi-camera-video-off"></i> 打开摄像头</button>
@@ -77,33 +76,29 @@
                             <button class="btn btn-outline-secondary" id="btnSendComment">发送</button>
                         </div>
                         <div class="d-flex flex-wrap gap-2 mb-2">
-                            <button class="btn btn-outline-success btn-sm" id="btnRecognizeSign" type="button">
-                                <i class="bi bi-camera"></i> 识别当前手语
-                            </button>
                             <button class="btn btn-outline-secondary btn-sm" id="btnClearSignBuffer" type="button">
-                                <i class="bi bi-eraser"></i> 清空手势码
+                                <i class="bi bi-eraser"></i> 清空输入框
                             </button>
-                            <span class="small text-muted align-self-center" id="signRecognitionStatus">打开摄像头后可录制短视频片段；当前接入的是固定短句演示模式。</span>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="fixedPhraseMode" checked>
-                            <label class="form-check-label small" for="fixedPhraseMode">启用固定短句识别模式</label>
+                            <button class="btn btn-outline-primary btn-sm" id="btnStartSignRecord" type="button">
+                                <i class="bi bi-record-circle"></i> 开始录制手语
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" id="btnStopSignRecord" type="button" disabled>
+                                <i class="bi bi-stop-circle"></i> 结束录制
+                            </button>
+                            <span class="small text-muted align-self-center" id="signRecognitionStatus">打开摄像头后，在右侧「我自己的视频」右下角会出现骨骼点窗口；做出手语动作后会自动填入输入框，可勾选“识别后自动发送到老师端”。</span>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="autoSendRecognizedComment">
                             <label class="form-check-label small" for="autoSendRecognizedComment">识别后自动发送到老师端</label>
                         </div>
                         <div class="border rounded p-2 bg-white small mb-2">
-                            <div class="fw-semibold mb-1">演示短句码</div>
-                            <div class="d-flex flex-wrap gap-2" id="phraseLegend">
-                                <span class="badge text-bg-light">LS = 老师好</span>
-                                <span class="badge text-bg-light">WY = 我有问题</span>
-                                <span class="badge text-bg-light">CQ = 请重复一遍</span>
-                                <span class="badge text-bg-light">BT = 我没听清</span>
-                                <span class="badge text-bg-light">XX = 谢谢老师</span>
-                                <span class="badge text-bg-light">KS = 可以开始了吗</span>
+                            <div class="fw-semibold mb-1">手语识别测试手势（建议离镜头 50–80cm，手在胸前）</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge text-bg-light">👍 竖大拇指并保持 1 秒：听懂了</span>
+                                <span class="badge text-bg-light">✋ 五指张开并保持 1 秒：提问</span>
+                                <span class="badge text-bg-light">🙅 五指张开左右摆手：没听懂</span>
+                                <span class="badge text-bg-light">👌 食指与拇指捏成圈：OK/可以开始</span>
                             </div>
-                            <div class="text-muted mt-2" id="phraseModeStatus">当前手势码缓冲区：空</div>
                         </div>
                         <div id="subtitleArea" class="border rounded p-2 bg-light flex-grow-1" style="height:150px; overflow-y:auto; font-size:1.05rem;">
                             <p class="text-muted text-center mb-0 small mt-2">课堂消息将显示在这里...</p>
@@ -119,27 +114,24 @@
                             <input class="form-check-input" type="checkbox" id="voiceControlEnabled">
                             <label class="form-check-label small" for="voiceControlEnabled">开启语音控制网页</label>
                         </div>
-                        <div class="small text-muted mb-2" id="voiceControlStatus">语音控制已关闭。可说“加入课堂”“打开摄像头”“朗读当前页”等命令。</div>
-                        <ul class="list-group list-group-flush mb-2" id="coursewareList">
-                            <li class="list-group-item text-muted text-center border-0 py-1">等待加载...</li>
-                        </ul>
-                        <div class="border rounded p-2 bg-light small mb-3 d-flex flex-column flex-grow-1" id="previewText" aria-live="polite">
-                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPrevPreviewPage">上一页</button>
-                                <span class="text-muted text-center flex-grow-1" id="previewPageIndicator">未选择课件</span>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnNextPreviewPage">下一页</button>
+                        <div class="small text-muted mb-2" id="voiceControlStatus">语音控制已关闭。可说“加入课堂”“打开摄像头”“总结/提炼”等命令。</div>
+                        <div class="d-flex flex-column flex-grow-1 p-3 border rounded bg-light mb-3">
+                            <div class="text-center mb-3">
+                                <i class="bi bi-robot text-primary mb-2" style="font-size: 2rem;"></i>
+                                <p class="small text-muted mb-2">点击下方按钮，AI 将基于老师当前展示的课件内容提炼核心知识点，并以文字/语音呈现。</p>
+                                <div class="d-flex justify-content-center gap-2 mb-2">
+                                    <button type="button" class="btn btn-primary btn-sm" id="btnSummarizePage">
+                                        <i class="bi bi-magic"></i> AI 知识总结
+                                    </button>
+                                </div>
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox" id="muteAiSpeech">
+                                    <label class="form-check-label small text-muted" for="muteAiSpeech">静音模式 (仅看文字不朗读)</label>
+                                </div>
                             </div>
-                            <div class="border rounded bg-white p-3 flex-grow-1" id="previewPageContent" style="min-height:220px; max-height:none; overflow-y:auto; white-space:pre-wrap; line-height:1.7;">
-                                <span class="text-muted">点击课件可预览文字；支持时将按页朗读。</span>
+                            <div id="aiSummaryArea" class="border rounded bg-white p-2 small" style="display: none; min-height: 80px; max-height: 150px; overflow-y: auto;">
+                                <!-- AI 总结内容显示在这里 -->
                             </div>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="autoReadCurrentPage">
-                            <label class="form-check-label small" for="autoReadCurrentPage">自动朗读当前PPT页内容</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="autoSpeakSubtitles">
-                            <label class="form-check-label small" for="autoSpeakSubtitles">自动朗读老师发送的课堂字幕</label>
                         </div>
                     </div>
                     <div class="card-footer bg-white mt-auto">
@@ -171,6 +163,10 @@
                 <!-- 学生自己的视频 -->
                 <div class="video-container mb-2 position-relative bg-dark rounded shadow-sm" style="aspect-ratio: 4/3; overflow: hidden;">
                     <video id="localVideo" autoplay muted playsinline class="w-100 h-100 object-fit-cover" style="display: none;"></video>
+                    
+                    <!-- MediaPipe 的渲染画布，绝对定位覆盖在自己视频的右下角 -->
+                    <canvas id="signCanvas" width="320" height="240" class="position-absolute bottom-0 end-0 border border-success" style="display:none; width:40%; max-width:160px; z-index:10; pointer-events:none;"></canvas>
+
                     <div id="localVideoOff" class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white-50">
                         <i class="bi bi-camera-video-off mb-1" style="font-size: 1.5rem;"></i>
                         <span class="small">摄像头已关闭</span>
@@ -188,23 +184,16 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+    <script>
     let ws = null;
-    let autoSpeakSubtitles = false;
     let joinedClassroomId = null;
 
     // 音视频控制状态
     let localStream = null;
     let isCamOn = false;
     let isMicOn = false;
-    let signRecorder = null;
-    let signChunks = [];
     let currentCoursewareText = "";
     let currentCoursewareName = "";
-    let currentCoursewarePages = [];
-    let currentCoursewareItems = [];
-    let currentCoursewareIndex = -1;
-    let currentPreviewPageIndex = 0;
     let voiceControlEnabled = false;
     let voiceRecognizer = null;
     let voiceRecognizerStarting = false;
@@ -216,25 +205,10 @@
     let pendingCandidates = [];
     const configuration = {
         'iceServers': [
-            { 'urls': 'stun:stun.l.google.com:19302' }
+            { 'urls': 'stun:stun.qq.com:3478' },
+            { 'urls': 'stun:stun.miwifi.com:3478' }
         ]
     };
-    const fixedPhraseMap = {
-        LS: "老师好",
-        WY: "我有问题",
-        CQ: "请重复一遍",
-        BT: "我没听清",
-        XX: "谢谢老师",
-        KS: "可以开始了吗"
-    };
-
-    function getLetterBuffer() {
-        return (document.getElementById("commentInput").value || "").toUpperCase().replace(/[^A-Z]/g, "");
-    }
-
-    function updatePhraseModeStatus(message) {
-        document.getElementById("phraseModeStatus").textContent = message;
-    }
 
     function updateTeacherSpeechDisplay(text) {
         document.getElementById("teacherSpeechText").textContent = text || "等待老师发送字幕...";
@@ -252,17 +226,6 @@
         btn.textContent = joinPanelCollapsed ? "展开" : "收起";
     }
 
-    function speakTeacherSpeech() {
-        const text = (document.getElementById("teacherSpeechText").textContent || "").trim();
-        if (!text || text === "等待老师发送字幕...") {
-            updateVoiceControlStatus("当前没有可朗读的老师发言。");
-            return false;
-        }
-        speak(text);
-        updateVoiceControlStatus("正在朗读老师当前发言。");
-        return true;
-    }
-
     async function toggleMainScreenFullscreen() {
         const panel = document.getElementById("mainScreenPanel");
         if (!document.fullscreenElement) {
@@ -273,130 +236,6 @@
         return true;
     }
 
-    function syncPhraseModeHint() {
-        const code = getLetterBuffer();
-        if (!code) {
-            updatePhraseModeStatus("当前手势码缓冲区：空");
-            return;
-        }
-        if (fixedPhraseMap[code]) {
-            updatePhraseModeStatus(`当前手势码缓冲区：${code}，匹配短句“${fixedPhraseMap[code]}”`);
-            return;
-        }
-        const partialMatches = Object.keys(fixedPhraseMap).filter((key) => key.startsWith(code));
-        if (partialMatches.length) {
-            updatePhraseModeStatus(`当前手势码缓冲区：${code}，继续识别可匹配 ${partialMatches.join(" / ")}`);
-            return;
-        }
-        updatePhraseModeStatus(`当前手势码缓冲区：${code}，暂未匹配预设短句`);
-    }
-
-    function applyRecognizedSignResult(data) {
-        const input = document.getElementById("commentInput");
-        const current = input.value || "";
-        switch (data.action) {
-            case "append":
-                input.value = current + (data.text || "");
-                break;
-            case "space":
-                input.value = current + " ";
-                break;
-            case "delete":
-                input.value = current.slice(0, -1);
-                break;
-            default:
-                break;
-        }
-        syncPhraseModeHint();
-    }
-
-    function tryResolveFixedPhrase() {
-        if (!document.getElementById("fixedPhraseMode").checked) return null;
-        const code = getLetterBuffer();
-        const phrase = fixedPhraseMap[code];
-        if (!phrase) return null;
-        document.getElementById("commentInput").value = phrase;
-        updatePhraseModeStatus(`已将手势码 ${code} 映射为短句“${phrase}”`);
-        return phrase;
-    }
-
-    async function recognizeSignFromVideoClip() {
-        const statusEl = document.getElementById("signRecognitionStatus");
-        if (!localStream || !isCamOn) {
-            statusEl.textContent = "请先打开摄像头，再进行手语识别。";
-            return;
-        }
-
-        const videoTracks = localStream.getVideoTracks();
-        if (!videoTracks.length) {
-            statusEl.textContent = "当前没有可用的视频轨道。";
-            return;
-        }
-
-        if (!window.MediaRecorder) {
-            statusEl.textContent = "当前浏览器不支持视频片段录制。";
-            return;
-        }
-        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-            ? "video/webm;codecs=vp8"
-            : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
-
-        signChunks = [];
-        signRecorder = mimeType
-            ? new MediaRecorder(new MediaStream(videoTracks), { mimeType })
-            : new MediaRecorder(new MediaStream(videoTracks));
-
-        signRecorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) signChunks.push(event.data);
-        };
-
-        signRecorder.onerror = () => {
-            statusEl.textContent = "视频录制失败，请检查摄像头权限。";
-        };
-
-        signRecorder.onstop = async () => {
-            const recordedType = signRecorder.mimeType || (signChunks[0] && signChunks[0].type) || "video/webm";
-            const blob = new Blob(signChunks, { type: recordedType });
-            if (!blob.size) {
-                statusEl.textContent = "未录到有效手势片段，请重试。";
-                return;
-            }
-
-            const ext = recordedType.includes("mp4") ? "mp4" : "webm";
-            const fd = new FormData();
-            fd.append("video", blob, "sign-clip." + ext);
-            statusEl.textContent = "正在分析短视频手势片段...";
-            const res = await fetch("/api/recognize/sign", {
-                method: "POST",
-                body: fd,
-                credentials: "same-origin"
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                statusEl.textContent = data.error || "手语识别失败";
-                return;
-            }
-
-            applyRecognizedSignResult(data);
-            const resolvedPhrase = tryResolveFixedPhrase();
-            const confidenceText = typeof data.confidence === "number" ? `，置信度 ${(data.confidence * 100).toFixed(1)}%` : "";
-            const sampleText = data.samples ? `，采样帧 ${data.samples}` : "";
-            statusEl.textContent = resolvedPhrase
-                ? `已识别固定短句“${resolvedPhrase}”`
-                : (data.note || "识别完成") + `（${data.label || "unknown"}${confidenceText}${sampleText}）`;
-            if (document.getElementById("autoSendRecognizedComment").checked) {
-                sendComment();
-            }
-        };
-
-        statusEl.textContent = "正在录制 2 秒手势片段...";
-        signRecorder.start();
-        window.setTimeout(() => {
-            if (signRecorder && signRecorder.state !== "inactive") {
-                signRecorder.stop();
-            }
-        }, 2000);
-    }
 
     function appendLine(title, body, cls) {
         const area = document.getElementById("subtitleArea");
@@ -425,114 +264,6 @@
             }
         };
         window.speechSynthesis.speak(u);
-    }
-
-    function speakCurrentPage() {
-        const text = (currentCoursewareText || "").trim();
-        if (!text) {
-            updateVoiceControlStatus("当前没有可朗读的PPT页内容。");
-            return false;
-        }
-        speak(text);
-        updateVoiceControlStatus("正在朗读当前PPT页内容。");
-        return true;
-    }
-
-    function updateCurrentCoursewareText(name, text) {
-        currentCoursewareName = name || "";
-        currentCoursewareText = text || "";
-        if (document.getElementById("autoReadCurrentPage").checked && currentCoursewareText.trim()) {
-            speakCurrentPage();
-        }
-    }
-
-    function renderPreviewPage() {
-        const content = document.getElementById("previewPageContent");
-        const indicator = document.getElementById("previewPageIndicator");
-        const prevBtn = document.getElementById("btnPrevPreviewPage");
-        const nextBtn = document.getElementById("btnNextPreviewPage");
-        if (!currentCoursewarePages.length) {
-            indicator.textContent = "未选择课件";
-            content.innerHTML = '<span class="text-muted">点击课件可预览文字；支持时将按页朗读。</span>';
-            prevBtn.disabled = true;
-            nextBtn.disabled = true;
-            updateCurrentCoursewareText("", "");
-            return;
-        }
-        currentPreviewPageIndex = Math.max(0, Math.min(currentPreviewPageIndex, currentCoursewarePages.length - 1));
-        const pageText = currentCoursewarePages[currentPreviewPageIndex] || "（本页暂无可提取文本）";
-        indicator.textContent = `${currentCoursewareName || "当前课件"} · 第 ${currentPreviewPageIndex + 1} / ${currentCoursewarePages.length} 页`;
-        content.textContent = pageText;
-        prevBtn.disabled = currentPreviewPageIndex <= 0;
-        nextBtn.disabled = currentPreviewPageIndex >= currentCoursewarePages.length - 1;
-        updateCurrentCoursewareText(currentCoursewareName, pageText);
-    }
-
-    function setPreviewPages(name, pages) {
-        currentCoursewareName = name || "";
-        currentCoursewarePages = Array.isArray(pages) && pages.length ? pages : ["（暂无可提取文本）"];
-        currentPreviewPageIndex = 0;
-        renderPreviewPage();
-    }
-
-    function setCurrentCoursewareIndexById(cwId) {
-        currentCoursewareIndex = currentCoursewareItems.findIndex((item) => Number(item.id) === Number(cwId));
-    }
-
-    async function previewCourseware(cw) {
-        if (!cw) return false;
-        if (joinedClassroomId == null) {
-            setPreviewPages("", ["请先加入课堂"]);
-            return false;
-        }
-        const res = await fetch(
-            "/api/courseware/" + cw.id + "/text?classroom_id=" + encodeURIComponent(joinedClassroomId),
-            { credentials: "same-origin" }
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            setPreviewPages("", [data.error || "加载失败"]);
-            return false;
-        }
-        const pages = Array.isArray(data.pages) && data.pages.length ? data.pages : [data.text || "（暂无提取文本）"];
-        setPreviewPages(data.name || cw.name || "", pages);
-        setCurrentCoursewareIndexById(cw.id);
-        speakCurrentPage();
-        return true;
-    }
-
-    async function showCoursewareOnMainScreen(cw) {
-        if (!cw) return false;
-        if (joinedClassroomId == null) {
-            appendLine("系统", "请先加入课堂", "text-danger");
-            return false;
-        }
-        const res = await fetch(
-            "/api/courseware/" + cw.id + "/display?classroom_id=" + encodeURIComponent(joinedClassroomId),
-            { credentials: "same-origin" }
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            appendLine("系统", data.error || "课件展示失败", "text-danger");
-            return false;
-        }
-        renderMainCourseware(data);
-        setCurrentCoursewareIndexById(cw.id);
-        appendLine("系统", "已在主屏幕展示课件：" + (data.name || cw.name || "课件"), "text-info");
-        return true;
-    }
-
-    async function showCoursewareByIndex(index) {
-        if (!currentCoursewareItems.length) {
-            updateVoiceControlStatus("当前没有可展示的课件。");
-            return false;
-        }
-        const boundedIndex = Math.max(0, Math.min(index, currentCoursewareItems.length - 1));
-        const ok = await showCoursewareOnMainScreen(currentCoursewareItems[boundedIndex]);
-        if (ok) {
-            updateVoiceControlStatus("已展示课件：" + currentCoursewareItems[boundedIndex].name);
-        }
-        return ok;
     }
 
     function normalizeVoiceCommand(text) {
@@ -580,50 +311,8 @@
             if (isMicOn) document.getElementById("btnToggleMic").click();
             return;
         }
-        if (text.includes("朗读当前页") || text.includes("朗读当前页内容") || text.includes("朗读课件")) {
-            speakCurrentPage();
-            return;
-        }
-        if (text.includes("朗读老师发言") || text.includes("重复老师发言") || text.includes("朗读老师当前发言")) {
-            speakTeacherSpeech();
-            return;
-        }
-        if (text.includes("下一页")) {
-            if (currentCoursewarePages.length > 1 && currentPreviewPageIndex < currentCoursewarePages.length - 1) {
-                currentPreviewPageIndex += 1;
-                renderPreviewPage();
-                updateVoiceControlStatus("已切换到下一页。");
-            }
-            return;
-        }
-        if (text.includes("上一页")) {
-            if (currentCoursewarePages.length > 1 && currentPreviewPageIndex > 0) {
-                currentPreviewPageIndex -= 1;
-                renderPreviewPage();
-                updateVoiceControlStatus("已切换到上一页。");
-            }
-            return;
-        }
-        if (text.includes("展示课件")) {
-            const nthMatch = text.match(/第([一二三四五六七八九十\d]+)个/);
-            if (nthMatch) {
-                const zhMap = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "七":7, "八":8, "九":9, "十":10 };
-                const raw = nthMatch[1];
-                const index = /^\d+$/.test(raw) ? Number(raw) - 1 : ((zhMap[raw] || 1) - 1);
-                await showCoursewareByIndex(index);
-            } else if (currentCoursewareIndex >= 0) {
-                await showCoursewareByIndex(currentCoursewareIndex);
-            } else {
-                await showCoursewareByIndex(0);
-            }
-            return;
-        }
-        if (text.includes("下一个课件")) {
-            await showCoursewareByIndex(currentCoursewareIndex >= 0 ? currentCoursewareIndex + 1 : 0);
-            return;
-        }
-        if (text.includes("上一个课件")) {
-            await showCoursewareByIndex(currentCoursewareIndex >= 0 ? currentCoursewareIndex - 1 : 0);
+        if (text.includes("总结") || text.includes("AI总结") || text.includes("提炼")) {
+            document.getElementById("btnSummarizePage").click();
             return;
         }
         if (text.includes("全屏") || text.includes("全屏显示")) {
@@ -645,14 +334,6 @@
             document.getElementById("btnStopSpeech").click();
             return;
         }
-        if (text.includes("识别手语")) {
-            document.getElementById("btnRecognizeSign").click();
-            return;
-        }
-        if (text.includes("清空手势码")) {
-            document.getElementById("btnClearSignBuffer").click();
-            return;
-        }
         if (text.includes("发送评论") || text.includes("发送消息")) {
             const commentText = extractVoiceCommentContent(rawText);
             if (commentText) {
@@ -664,16 +345,6 @@
             sendComment();
             return;
         }
-        if (text.includes("开启固定短句模式")) {
-            document.getElementById("fixedPhraseMode").checked = true;
-            updateVoiceControlStatus("已开启固定短句模式。");
-            return;
-        }
-        if (text.includes("关闭固定短句模式")) {
-            document.getElementById("fixedPhraseMode").checked = false;
-            updateVoiceControlStatus("已关闭固定短句模式。");
-            return;
-        }
         if (text.includes("开启自动发送")) {
             document.getElementById("autoSendRecognizedComment").checked = true;
             updateVoiceControlStatus("已开启手语识别后自动发送。");
@@ -682,28 +353,6 @@
         if (text.includes("关闭自动发送")) {
             document.getElementById("autoSendRecognizedComment").checked = false;
             updateVoiceControlStatus("已关闭手语识别后自动发送。");
-            return;
-        }
-        if (text.includes("开启朗读当前页")) {
-            document.getElementById("autoReadCurrentPage").checked = true;
-            speakCurrentPage();
-            return;
-        }
-        if (text.includes("关闭朗读当前页")) {
-            document.getElementById("autoReadCurrentPage").checked = false;
-            updateVoiceControlStatus("已关闭自动朗读当前页。");
-            return;
-        }
-        if (text.includes("开启字幕朗读")) {
-            document.getElementById("autoSpeakSubtitles").checked = true;
-            autoSpeakSubtitles = true;
-            updateVoiceControlStatus("已开启字幕自动朗读。");
-            return;
-        }
-        if (text.includes("关闭字幕朗读")) {
-            document.getElementById("autoSpeakSubtitles").checked = false;
-            autoSpeakSubtitles = false;
-            updateVoiceControlStatus("已关闭字幕自动朗读。");
             return;
         }
         if (text.includes("打开语音控制")) {
@@ -781,17 +430,9 @@
         if (voiceRecognizer) {
             try { voiceRecognizer.stop(); } catch (e) {}
         }
-        updateVoiceControlStatus("语音控制已关闭。可说“加入课堂”“打开摄像头”“朗读当前页”等命令。");
+        updateVoiceControlStatus("语音控制已关闭。可说“加入课堂”“打开摄像头”“总结/提炼”等命令。");
     }
 
-    document.getElementById("autoSpeakSubtitles").addEventListener("change", (e) => {
-        autoSpeakSubtitles = e.target.checked;
-    });
-    document.getElementById("autoReadCurrentPage").addEventListener("change", (e) => {
-        if (e.target.checked && currentCoursewareText.trim()) {
-            speakCurrentPage();
-        }
-    });
     document.getElementById("voiceControlEnabled").addEventListener("change", (e) => {
         voiceControlEnabled = e.target.checked;
         if (voiceControlEnabled) {
@@ -803,9 +444,6 @@
     document.getElementById("btnToggleJoinPanel").addEventListener("click", () => {
         setJoinPanelCollapsed(!joinPanelCollapsed);
     });
-    document.getElementById("btnReadTeacherSpeech").addEventListener("click", () => {
-        speakTeacherSpeech();
-    });
     document.getElementById("btnFullscreenMain").addEventListener("click", async () => {
         try {
             await toggleMainScreenFullscreen();
@@ -813,23 +451,46 @@
             updateVoiceControlStatus("无法切换全屏：" + e.message);
         }
     });
-    document.getElementById("btnPrevPreviewPage").addEventListener("click", () => {
-        if (currentPreviewPageIndex > 0) {
-            currentPreviewPageIndex -= 1;
-            renderPreviewPage();
-        }
-    });
-    document.getElementById("btnNextPreviewPage").addEventListener("click", () => {
-        if (currentPreviewPageIndex < currentCoursewarePages.length - 1) {
-            currentPreviewPageIndex += 1;
-            renderPreviewPage();
-        }
-    });
 
     document.getElementById("btnStopSpeech").addEventListener("click", () => {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     });
-    renderPreviewPage();
+    document.getElementById("btnSummarizePage").addEventListener("click", async () => {
+        const text = (currentCoursewareText || "").trim();
+        if (!text) {
+            updateVoiceControlStatus("当前没有可总结的PPT页内容。");
+            return;
+        }
+
+        const summaryArea = document.getElementById("aiSummaryArea");
+        summaryArea.style.display = "block";
+        summaryArea.innerHTML = '<div class="text-center text-muted my-2"><div class="spinner-border spinner-border-sm" role="status"></div> 正在呼叫 AI 总结知识点...</div>';
+
+        try {
+            const res = await fetch("/api/llm/summarize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await res.json();
+            if (data.success) {
+                summaryArea.innerHTML = `<strong class="text-primary"><i class="bi bi-stars"></i> AI 总结：</strong><br>${data.summary.replace(/\n/g, '<br>')}`;
+                
+                const isMuted = document.getElementById("muteAiSpeech").checked;
+                if (!isMuted) {
+                    speak(data.summary);
+                    updateVoiceControlStatus("正在朗读 AI 总结内容。");
+                } else {
+                    updateVoiceControlStatus("AI 总结已生成（静音模式）。");
+                }
+            } else {
+                summaryArea.innerHTML = `<span class="text-danger">总结失败：${data.error}</span>`;
+            }
+        } catch (e) {
+            summaryArea.innerHTML = `<span class="text-danger">请求异常：${e.message}</span>`;
+        }
+    });
+
     setJoinPanelCollapsed(false);
 
     function connectWs(roomCode) {
@@ -860,7 +521,6 @@
                 case "subtitle":
                     // 与老师端一致：字幕仅在主屏幕底部展示，下方互动区不再重复一行
                     updateTeacherSpeechDisplay(msg.content);
-                    if (autoSpeakSubtitles && msg.content) speak(msg.content);
                     break;
                 case "subtitle_live":
                     updateTeacherSpeechDisplay(msg.content);
@@ -917,6 +577,11 @@
         const safeText = escapeHtml(data.text || "");
         const fileUrl = data.file_url ? String(data.file_url) : "";
         const originalUrl = fileUrl ? fileUrl.replace("variant=preview", "variant=original").replace("variant=auto", "variant=original") : "";
+        
+        // 更新当前朗读文本
+        currentCoursewareText = data.text || "";
+        currentCoursewareName = data.name || "";
+
         area.className = "w-100 h-100";
         if (mode === "pdf" && fileUrl) {
             const viewerUrl = `${fileUrl}#toolbar=1&navpanes=1&view=FitH`;
@@ -1076,44 +741,6 @@
     }
     // --- WebRTC 逻辑结束 ---
 
-    async function loadCoursewareList(items) {
-        currentCoursewareItems = Array.isArray(items) ? items : [];
-        currentCoursewareIndex = currentCoursewareItems.length ? 0 : -1;
-        const ul = document.getElementById("coursewareList");
-        ul.innerHTML = "";
-        if (!items || !items.length) {
-            ul.innerHTML = '<li class="list-group-item text-muted text-center border-0 py-1">暂无课件</li>';
-            return;
-        }
-        for (const cw of items) {
-            const li = document.createElement("li");
-            li.className = "list-group-item list-group-item-action border-0 px-2 py-1 d-flex justify-content-between align-items-center";
-            li.tabIndex = 0;
-            li.setAttribute("role", "button");
-            li.innerHTML = `
-                <span class="text-truncate" style="max-width: 52%;"><i class="bi bi-file-earmark-text"></i> ${cw.name}</span>
-                <div class="d-flex gap-1">
-                    <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btnPreviewCourseware" style="font-size: 0.75rem;">预览</button>
-                    <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 btnShowCoursewareStudent" style="font-size: 0.75rem;">展示</button>
-                    <a href="/api/courseware/${cw.id}/file?classroom_id=${encodeURIComponent(joinedClassroomId)}&variant=original" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" style="font-size: 0.75rem;" title="下载原件" onclick="event.stopPropagation()"><i class="bi bi-download"></i></a>
-                </div>
-            `;
-            li.addEventListener("click", async () => { await previewCourseware(cw); });
-            li.querySelector(".btnPreviewCourseware").addEventListener("click", async (ev) => {
-                ev.stopPropagation();
-                await previewCourseware(cw);
-            });
-            li.querySelector(".btnShowCoursewareStudent").addEventListener("click", async (ev) => {
-                ev.stopPropagation();
-                await showCoursewareOnMainScreen(cw);
-            });
-            li.addEventListener("keydown", (ev) => {
-                if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); li.click(); }
-            });
-            ul.appendChild(li);
-        }
-    }
-
     document.getElementById("btnJoin").addEventListener("click", async () => {
         const code = document.getElementById("roomCodeInput").value.trim().toUpperCase();
         const status = document.getElementById("joinStatus");
@@ -1136,7 +763,6 @@
         document.getElementById("commentInput").disabled = false;
         document.getElementById("btnSendComment").disabled = false;
         document.getElementById("classroomWorkspace").style.display = "flex";
-        await loadCoursewareList(data.courseware);
         connectWs(data.room_code);
         setJoinPanelCollapsed(true);
     });
@@ -1154,16 +780,15 @@
     }
 
     document.getElementById("btnSendComment").addEventListener("click", sendComment);
-    document.getElementById("btnRecognizeSign").addEventListener("click", recognizeSignFromVideoClip);
     document.getElementById("btnClearSignBuffer").addEventListener("click", () => {
         document.getElementById("commentInput").value = "";
-        updatePhraseModeStatus("当前手势码缓冲区：空");
-        document.getElementById("signRecognitionStatus").textContent = "已清空当前手势码缓冲区。";
+        document.getElementById("signRecognitionStatus").textContent = "已清空输入框。";
     });
     document.getElementById("commentInput").addEventListener("keydown", (e) => {
         if (e.key === "Enter") sendComment();
     });
-    document.getElementById("commentInput").addEventListener("input", syncPhraseModeHint);
+    // commentInput 的内容由学生手动输入或实时手语识别自动填充
+    // 也可通过“录制手语视频片段 -> 后端翻译 -> 自动填充”
 
     // ========== 麦克风与摄像头 ==========
     async function toggleMedia() {
@@ -1206,20 +831,51 @@
         updateMediaUI();
     }
 
+    let signDetector = null; // 手语识别器实例
+    let signRecorder = null;
+    let signRecordChunks = [];
+    let signRecordMaxTimer = null;
+    let signIsRecording = false;
+
     function updateMediaUI() {
         const videoEl = document.getElementById("localVideo");
         const videoOffEl = document.getElementById("localVideoOff");
         const btnCam = document.getElementById("btnToggleCam");
         const btnMic = document.getElementById("btnToggleMic");
         const micIcon = document.getElementById("localMicIcon");
+        const signCanvas = document.getElementById("signCanvas");
+
         if (isCamOn) {
             videoEl.style.display = "block"; videoOffEl.style.display = "none";
+            if (signCanvas) signCanvas.style.display = "block";
             btnCam.innerHTML = '<i class="bi bi-camera-video"></i> 关闭摄像头';
             btnCam.classList.replace("btn-outline-light", "btn-light");
+            
+            // 初始化或恢复手语识别
+            if (!signDetector && videoEl && signCanvas) {
+                signDetector = new SignLanguageDetector(videoEl, signCanvas);
+                signDetector.onSignDetected = (message) => {
+                    const input = document.getElementById("commentInput");
+                    input.value = message;
+                    appendLine("系统", "已识别手语: " + message, "text-success");
+                    if (document.getElementById("autoSendRecognizedComment").checked) {
+                        sendComment();
+                    }
+                };
+                signDetector.init();
+            } else if (signDetector && signDetector.camera) {
+                signDetector.camera.start();
+            }
         } else {
             videoEl.style.display = "none"; videoOffEl.style.display = "flex";
+            if (signCanvas) signCanvas.style.display = "none";
             btnCam.innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';
             btnCam.classList.replace("btn-light", "btn-outline-light");
+            
+            // 暂停手语识别
+            if (signDetector && signDetector.camera) {
+                signDetector.camera.stop();
+            }
         }
         if (isMicOn) {
             btnMic.innerHTML = '<i class="bi bi-mic"></i> 关闭麦克风';
@@ -1238,6 +894,110 @@
     document.getElementById("btnToggleCam").addEventListener("click", () => { isCamOn = !isCamOn; toggleMedia(); });
     document.getElementById("btnToggleMic").addEventListener("click", () => { isMicOn = !isMicOn; toggleMedia(); });
 
+    function setSignRecordUi(recording) {
+        signIsRecording = Boolean(recording);
+        const startBtn = document.getElementById("btnStartSignRecord");
+        const stopBtn = document.getElementById("btnStopSignRecord");
+        if (startBtn) startBtn.disabled = signIsRecording;
+        if (stopBtn) stopBtn.disabled = !signIsRecording;
+        const status = document.getElementById("signRecognitionStatus");
+        if (status) {
+            status.textContent = signIsRecording
+                ? "录制中…请做出手语动作，完成后点“结束录制”进行翻译。"
+                : "打开摄像头后可使用“开始录制手语/结束录制”进行翻译；也可继续使用骨骼点窗口的简易手势识别。";
+        }
+    }
+
+    async function uploadSignVideo(blob) {
+        const fd = new FormData();
+        const ext = blob.type && blob.type.includes("mp4") ? "mp4" : "webm";
+        fd.append("video", blob, "sign." + ext);
+        const res = await fetch("/api/recognize/sign", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin"
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || "手语翻译失败");
+        }
+        return String(data.text || "").trim();
+    }
+
+    function startSignRecording() {
+        if (signIsRecording) return;
+        if (!localStream || !localStream.getVideoTracks().length) {
+            appendLine("系统", "请先打开摄像头后再录制手语。", "text-danger");
+            return;
+        }
+        if (!window.MediaRecorder) {
+            appendLine("系统", "当前浏览器不支持录制功能，请更换浏览器或改用文字输入。", "text-danger");
+            return;
+        }
+
+        // 避免录太长：默认 15s 自动停止（用户也可手动点结束）
+        const MAX_MS = 15000;
+        signRecordChunks = [];
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? "video/webm;codecs=vp8,opus"
+            : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
+
+        const rec = mimeType
+            ? new MediaRecorder(new MediaStream([localStream.getVideoTracks()[0]]), { mimeType })
+            : new MediaRecorder(new MediaStream([localStream.getVideoTracks()[0]]));
+        signRecorder = rec;
+
+        rec.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) signRecordChunks.push(event.data);
+        };
+        rec.onerror = () => {
+            appendLine("系统", "录制失败，请检查摄像头权限。", "text-danger");
+            try { if (signRecordMaxTimer) clearTimeout(signRecordMaxTimer); } catch(e) {}
+            setSignRecordUi(false);
+        };
+        rec.onstop = async () => {
+            try { if (signRecordMaxTimer) clearTimeout(signRecordMaxTimer); } catch(e) {}
+            signRecordMaxTimer = null;
+            setSignRecordUi(false);
+
+            const blob = new Blob(signRecordChunks, { type: rec.mimeType || "video/webm" });
+            signRecordChunks = [];
+            if (!blob.size) {
+                appendLine("系统", "未录到有效视频片段。", "text-warning");
+                return;
+            }
+
+            appendLine("系统", "正在翻译手语…", "text-info");
+            try {
+                const text = await uploadSignVideo(blob);
+                if (!text) throw new Error("未返回有效翻译文本");
+                document.getElementById("commentInput").value = text;
+                appendLine("系统", "手语翻译结果：" + text, "text-success");
+                if (document.getElementById("autoSendRecognizedComment").checked) {
+                    sendComment();
+                }
+            } catch (e) {
+                appendLine("系统", e.message || "手语翻译失败", "text-danger");
+            }
+        };
+
+        rec.start();
+        setSignRecordUi(true);
+        signRecordMaxTimer = window.setTimeout(() => {
+            if (rec && rec.state === "recording") rec.stop();
+        }, MAX_MS);
+    }
+
+    function stopSignRecording() {
+        if (!signRecorder) return;
+        if (signRecorder.state === "recording") {
+            try { signRecorder.stop(); } catch (e) {}
+        }
+    }
+
+    document.getElementById("btnStartSignRecord").addEventListener("click", () => startSignRecording());
+    document.getElementById("btnStopSignRecord").addEventListener("click", () => stopSignRecording());
+
     document.getElementById("btnLeaveClassroom").addEventListener("click", () => {
         if ("speechSynthesis" in window) window.speechSynthesis.cancel();
         resetPeerConnection();
@@ -1254,18 +1014,21 @@
         document.getElementById("btnSendComment").disabled = true;
         currentCoursewareText = "";
         currentCoursewareName = "";
-        currentCoursewarePages = [];
-        currentCoursewareItems = [];
-        currentCoursewareIndex = -1;
-        currentPreviewPageIndex = 0;
-        renderPreviewPage();
         updateTeacherSpeechDisplay("");
         if (document.getElementById("voiceControlEnabled").checked) {
             document.getElementById("voiceControlEnabled").checked = false;
         }
         stopVoiceControlListening();
-        updatePhraseModeStatus("当前手势码缓冲区：空");
-        document.getElementById("signRecognitionStatus").textContent = "打开摄像头后可录制短视频片段；当前接入的是固定短句演示模式。";
+        // 停止录制
+        try {
+            if (signRecorder && signRecorder.state === "recording") signRecorder.stop();
+        } catch (e) {}
+        signRecorder = null;
+        signRecordChunks = [];
+        if (signRecordMaxTimer) { try { clearTimeout(signRecordMaxTimer); } catch(e){} }
+        signRecordMaxTimer = null;
+        setSignRecordUi(false);
+        document.getElementById("signRecognitionStatus").textContent = "打开摄像头后，在右侧「我自己的视频」右下角会出现骨骼点窗口；做出手语动作后会自动填入输入框，可勾选“识别后自动发送到老师端”。";
         document.getElementById("localVideo").style.display = "none";
         document.getElementById("localVideoOff").style.display = "flex";
         document.getElementById("btnToggleCam").innerHTML = '<i class="bi bi-camera-video-off"></i> 打开摄像头';

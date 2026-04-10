@@ -9,5 +9,17 @@ faster-whisper
 mlx-whisper; platform_system == "Darwin" and platform_machine == "arm64"
 imageio-ffmpeg
 transformers
+tiktoken
+sentencepiece
 python-docx
 pywin32; platform_system == "Windows"
+requests
+torch
+torchvision
+opencv-python
+numpy
+# TwoStreamNetwork / slrt_infer_service：utils.misc 会 import SummaryWriter 与 wandb
+tensorboard
+wandb
+# TwoStreamNetwork：recognition.py 用 TensorFlow 做 CTC beam search 解码（非训练也可按需安装）
+tensorflow
