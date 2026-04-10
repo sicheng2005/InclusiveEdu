@@ -19,6 +19,10 @@ platform.db
 *.db-journal
 uploads/
 
+# 模型文件
+slrt_vendor/TwoStreamNetwork/ckpts/best.ckpt
+slrt_vendor/TwoStreamNetwork/pretrained_models/
+
 # 环境变量与密钥
 .env
 .env.local
