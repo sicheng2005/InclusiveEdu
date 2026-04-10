@@ -19,9 +19,17 @@ platform.db
 *.db-journal
 uploads/
 
-# 模型文件
+# 模型文件（体积大，勿提交；本地推理前按 TwoStream 说明自行下载）
 slrt_vendor/TwoStreamNetwork/ckpts/best.ckpt
 slrt_vendor/TwoStreamNetwork/pretrained_models/
+
+# 主项目未引用，已从仓库裁剪；若本地仍保留这些目录可忽略以免误提交
+slrt_vendor/CiCo/
+slrt_vendor/Online/
+slrt_vendor/Spoken2Sign/
+slrt_vendor/NLA-SLR/
+slrt_vendor/TwoStreamNetwork/data/phoenix-2014/
+slrt_vendor/TwoStreamNetwork/data/phoenix-2014t/
 
 # 环境变量与密钥
 .env
